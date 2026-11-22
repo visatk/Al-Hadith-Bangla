@@ -3,13 +3,19 @@ package com.example.data.preferences
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.data.local.entity.QuranReadingProgress
 import com.example.data.local.entity.ReaderPreferences
 import com.example.ui.theme.ReaderThemeMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 
 private val Context.dataStore by preferencesDataStore(name = "al_hadith_reader_settings")
 
@@ -26,25 +32,69 @@ class UserPreferencesRepository(private val context: Context) {
         val EYE_CARE_WARM_FILTER = floatPreferencesKey("eye_care_warm_filter")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on_reading")
         val THEME_MODE = stringPreferencesKey("reader_theme_mode")
+
+        // Fast Startup Sync Fingerprint
+        val LAST_SYNC_FINGERPRINT = stringPreferencesKey("last_sync_fingerprint_v2")
+
+        // Al-Quran Reading Continuity
+        val LAST_QURAN_SURAH_ID = intPreferencesKey("last_quran_surah_id")
+        val LAST_QURAN_SURAH_NAME_BN = stringPreferencesKey("last_quran_surah_name_bn")
+        val LAST_QURAN_AYAH_NUMBER = intPreferencesKey("last_quran_ayah_number")
     }
 
-    val readerPreferencesFlow: Flow<ReaderPreferences> = context.dataStore.data.map { prefs ->
+    private val safeDataFlow = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+
+    val readerPreferencesFlow: Flow<ReaderPreferences> = safeDataFlow.map { prefs ->
         val themeStr = prefs[Keys.THEME_MODE] ?: ReaderThemeMode.MANUSCRIPT_LIGHT.name
         val themeMode = runCatching { ReaderThemeMode.valueOf(themeStr) }
             .getOrDefault(ReaderThemeMode.MANUSCRIPT_LIGHT)
 
         ReaderPreferences(
-            arabicFontSizeSp = prefs[Keys.ARABIC_FONT_SIZE] ?: 26f,
-            banglaFontSizeSp = prefs[Keys.BANGLA_FONT_SIZE] ?: 17f,
-            lineHeightMultiplier = prefs[Keys.LINE_HEIGHT_MULTIPLIER] ?: 1.65f,
+            arabicFontSizeSp = (prefs[Keys.ARABIC_FONT_SIZE] ?: 26f).coerceIn(20f, 40f),
+            banglaFontSizeSp = (prefs[Keys.BANGLA_FONT_SIZE] ?: 17f).coerceIn(14f, 26f),
+            lineHeightMultiplier = (prefs[Keys.LINE_HEIGHT_MULTIPLIER] ?: 1.65f).coerceIn(1.4f, 2.1f),
             showArabic = prefs[Keys.SHOW_ARABIC] ?: true,
             showTransliteration = prefs[Keys.SHOW_TRANSLITERATION] ?: false,
             showExplanation = prefs[Keys.SHOW_EXPLANATION] ?: true,
             showTashkeel = prefs[Keys.SHOW_TASHKEEL] ?: true,
-            eyeCareWarmFilter = prefs[Keys.EYE_CARE_WARM_FILTER] ?: 0.0f,
+            eyeCareWarmFilter = (prefs[Keys.EYE_CARE_WARM_FILTER] ?: 0.0f).coerceIn(0f, 0.28f),
             keepScreenOnWhileReading = prefs[Keys.KEEP_SCREEN_ON] ?: true,
             themeMode = themeMode
         )
+    }
+
+    val quranReadingProgressFlow: Flow<QuranReadingProgress?> = safeDataFlow.map { prefs ->
+        val surahId = prefs[Keys.LAST_QURAN_SURAH_ID] ?: return@map null
+        val surahNameBn = prefs[Keys.LAST_QURAN_SURAH_NAME_BN] ?: return@map null
+        val ayahNumber = prefs[Keys.LAST_QURAN_AYAH_NUMBER] ?: 1
+        QuranReadingProgress(
+            surahId = surahId,
+            surahNameBn = surahNameBn,
+            ayahNumber = ayahNumber
+        )
+    }
+
+    suspend fun getLastSyncFingerprint(): String {
+        return safeDataFlow.first()[Keys.LAST_SYNC_FINGERPRINT].orEmpty()
+    }
+
+    suspend fun saveLastSyncFingerprint(fingerprint: String) {
+        context.dataStore.edit { it[Keys.LAST_SYNC_FINGERPRINT] = fingerprint }
+    }
+
+    suspend fun saveQuranReadingProgress(surahId: Int, surahNameBn: String, ayahNumber: Int) {
+        context.dataStore.edit {
+            it[Keys.LAST_QURAN_SURAH_ID] = surahId
+            it[Keys.LAST_QURAN_SURAH_NAME_BN] = surahNameBn
+            it[Keys.LAST_QURAN_AYAH_NUMBER] = ayahNumber.coerceAtLeast(1)
+        }
     }
 
     suspend fun updateArabicFontSize(sizeSp: Float) {

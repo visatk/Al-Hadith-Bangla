@@ -1,16 +1,15 @@
 package com.example.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-enum class ReaderThemeMode(val titleBn: String) {
-    MANUSCRIPT_LIGHT("পান্ডুলিপি লাইট"),
-    SEPIA_SCHOLAR("সেপিয়া পেপার"),
-    TAHAJJUD_DARK("তাহাজ্জুদ ডার্ক")
+enum class ReaderThemeMode(val titleBn: String, val isDark: Boolean) {
+    MANUSCRIPT_LIGHT("পান্ডুলিপি লাইট", isDark = false),
+    SEPIA_SCHOLAR("সেপিয়া পেপার", isDark = false),
+    TAHAJJUD_DARK("তাহাজ্জুদ ডার্ক", isDark = true)
 }
 
 private val ManuscriptLightColorScheme = lightColorScheme(
@@ -76,11 +75,10 @@ private val TahajjudDarkColorScheme = darkColorScheme(
 @Composable
 fun AlHadithBanglaTheme(
     themeMode: ReaderThemeMode = ReaderThemeMode.MANUSCRIPT_LIGHT,
-    systemDark: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
     val colorScheme = when (themeMode) {
-        ReaderThemeMode.MANUSCRIPT_LIGHT -> if (systemDark) TahajjudDarkColorScheme else ManuscriptLightColorScheme
+        ReaderThemeMode.MANUSCRIPT_LIGHT -> ManuscriptLightColorScheme
         ReaderThemeMode.SEPIA_SCHOLAR -> SepiaScholarColorScheme
         ReaderThemeMode.TAHAJJUD_DARK -> TahajjudDarkColorScheme
     }

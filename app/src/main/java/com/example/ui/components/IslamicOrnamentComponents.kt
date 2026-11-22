@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -35,10 +36,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.GradeDaifBg
+import com.example.ui.theme.GradeDaifDarkBg
+import com.example.ui.theme.GradeDaifDarkText
 import com.example.ui.theme.GradeDaifText
 import com.example.ui.theme.GradeHasanBg
+import com.example.ui.theme.GradeHasanDarkBg
+import com.example.ui.theme.GradeHasanDarkText
 import com.example.ui.theme.GradeHasanText
+import com.example.ui.theme.GradeMawduBg
+import com.example.ui.theme.GradeMawduDarkBg
+import com.example.ui.theme.GradeMawduDarkText
+import com.example.ui.theme.GradeMawduText
 import com.example.ui.theme.GradeSahihBg
+import com.example.ui.theme.GradeSahihDarkBg
+import com.example.ui.theme.GradeSahihDarkText
 import com.example.ui.theme.GradeSahihText
 
 /**
@@ -101,27 +112,28 @@ fun TahqiqGradeBadge(
     modifier: Modifier = Modifier
 ) {
     val upper = gradeType.uppercase()
+    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val bgColor: Color
     val textColor: Color
     val icon = when (upper) {
         "HASAN" -> {
-            bgColor = GradeHasanBg
-            textColor = GradeHasanText
+            bgColor = if (isDarkTheme) GradeHasanDarkBg else GradeHasanBg
+            textColor = if (isDarkTheme) GradeHasanDarkText else GradeHasanText
             Icons.Default.Verified
         }
         "DAIF" -> {
-            bgColor = GradeDaifBg
-            textColor = GradeDaifText
+            bgColor = if (isDarkTheme) GradeDaifDarkBg else GradeDaifBg
+            textColor = if (isDarkTheme) GradeDaifDarkText else GradeDaifText
             Icons.Default.WarningAmber
         }
         "MAWDU" -> {
-            bgColor = Color(0xFFFADBD8)
-            textColor = Color(0xFF78281F)
+            bgColor = if (isDarkTheme) GradeMawduDarkBg else GradeMawduBg
+            textColor = if (isDarkTheme) GradeMawduDarkText else GradeMawduText
             Icons.Default.ErrorOutline
         }
         else -> {
-            bgColor = GradeSahihBg
-            textColor = GradeSahihText
+            bgColor = if (isDarkTheme) GradeSahihDarkBg else GradeSahihBg
+            textColor = if (isDarkTheme) GradeSahihDarkText else GradeSahihText
             Icons.Default.Verified
         }
     }
@@ -130,9 +142,9 @@ fun TahqiqGradeBadge(
         modifier = modifier
             .clip(RoundedCornerShape(50))
             .background(bgColor)
-            .border(1.dp, textColor.copy(alpha = 0.32f), RoundedCornerShape(50))
+            .border(1.dp, textColor.copy(alpha = if (isDarkTheme) 0.42f else 0.32f), RoundedCornerShape(50))
             .padding(horizontal = 10.dp, vertical = 4.dp)
-            .semantics { contentDescription = "তাহকীক মান: $gradeBn" },
+            .semantics(mergeDescendants = true) { contentDescription = "তাহকীক মান: $gradeBn" },
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(

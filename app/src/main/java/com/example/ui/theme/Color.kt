@@ -38,7 +38,7 @@ val ObsidianBorder = Color(0xFF1F4239)
 val IvoryTextPrimary = Color(0xFFF2EFE9)
 val IvoryTextSecondary = Color(0xFFA7BDB5)
 
-// Tahqiq / Hadith Authenticity Grade Colors
+// Tahqiq / Hadith Authenticity Grade Colors (WCAG AA compliant for both Light & Dark themes)
 val GradeSahihBg = Color(0xFFDDF5EA)
 val GradeSahihText = Color(0xFF0A6847)
 val GradeSahihDarkBg = Color(0xFF103F2E)
@@ -51,3 +51,10 @@ val GradeHasanDarkText = Color(0xFFF5C469)
 
 val GradeDaifBg = Color(0xFFFCE2DE)
 val GradeDaifText = Color(0xFFA8382B)
+val GradeDaifDarkBg = Color(0xFF471A16)
+val GradeDaifDarkText = Color(0xFFF5A49B)
+
+val GradeMawduBg = Color(0xFFFADBD8)
+val GradeMawduText = Color(0xFF78281F)
+val GradeMawduDarkBg = Color(0xFF511310)
+val GradeMawduDarkText = Color(0xFFFF9B94)

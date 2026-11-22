@@ -1,10 +1,15 @@
 package com.example
 
+import com.example.data.local.entity.AyahEntity
+import com.example.data.local.entity.HadithEntity
+import com.example.ui.components.formatHadithForShare
 import com.example.ui.components.stripArabicTashkeel
 import com.example.ui.components.toBanglaDigits
 import com.example.ui.components.toEnglishDigits
-import org.json.JSONArray
+import com.example.ui.screens.formatAyahForShare
+import com.example.ui.theme.ReaderThemeMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -51,5 +56,50 @@ class ExampleUnitTest {
         val vocalized = "بِسْمِ اللَّهِ"
         val stripped = vocalized.stripArabicTashkeel(keepTashkeel = false)
         assertTrue(stripped.length < vocalized.length)
+        assertEquals(vocalized, vocalized.stripArabicTashkeel(keepTashkeel = true))
+    }
+
+    @Test
+    fun `verify ReaderThemeMode isDark flags`() {
+        assertFalse(ReaderThemeMode.MANUSCRIPT_LIGHT.isDark)
+        assertFalse(ReaderThemeMode.SEPIA_SCHOLAR.isDark)
+        assertTrue(ReaderThemeMode.TAHAJJUD_DARK.isDark)
+    }
+
+    @Test
+    fun `verify formatted share strings omit blank narrator and preserve references`() {
+        val hadith = HadithEntity(
+            id = 1,
+            bookId = 1,
+            chapterId = 101,
+            sectionId = 1,
+            hadithNumber = 1,
+            internationalNumber = "বুখারী ১",
+            narratorBn = "",
+            arabicText = "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ",
+            banglaText = "সকল আমল নিয়তের উপর নির্ভরশীল।",
+            transliterationBn = "",
+            explanationBn = "",
+            gradeBn = "সহীহ হাদিস",
+            gradeType = "SAHIH",
+            referenceBn = "সহীহ বুখারী • হাদিস নং ১",
+            topicTags = "নিয়ত,ইখলাস"
+        )
+        val formattedHadith = formatHadithForShare(hadith)
+        assertFalse(formattedHadith.contains("হতে বর্ণিত:"))
+        assertTrue(formattedHadith.contains("সহীহ বুখারী"))
+
+        val ayah = AyahEntity(
+            id = 200255,
+            surahId = 2,
+            ayahNumber = 255,
+            surahNameBn = "আল-বাকারা",
+            surahNameAr = "البقرة",
+            arabicText = "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
+            banglaTranslation = "আল্লাহ, তিনি ব্যতীত কোনো উপাস্য নেই।"
+        )
+        val formattedAyah = formatAyahForShare(ayah)
+        assertTrue(formattedAyah.contains("২৫৫"))
+        assertTrue(formattedAyah.contains("আল-বাকারা"))
     }
 }

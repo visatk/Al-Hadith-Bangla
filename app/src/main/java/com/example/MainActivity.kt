@@ -39,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,10 +50,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.local.entity.HadithEntity
@@ -74,12 +82,38 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: HadithViewModel = viewModel()
             val readerPreferences by viewModel.readerPreferences.collectAsStateWithLifecycle()
+            val isFocusMode by viewModel.isFocusMode.collectAsStateWithLifecycle()
+            val view = LocalView.current
 
+            // Sync Keep-Screen-On ergonomic flag
             LaunchedEffect(readerPreferences.keepScreenOnWhileReading) {
                 if (readerPreferences.keepScreenOnWhileReading) {
                     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 } else {
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
+
+            // Sync edge-to-edge status/navigation bar icon contrast with ReaderThemeMode
+            LaunchedEffect(readerPreferences.themeMode) {
+                val controller = WindowCompat.getInsetsController(window, view)
+                val useDarkIcons = !readerPreferences.themeMode.isDark
+                controller.isAppearanceLightStatusBars = useDarkIcons
+                controller.isAppearanceLightNavigationBars = useDarkIcons
+            }
+
+            // True immersive Focus Mode: hide status bar with transient swipe-to-reveal
+            DisposableEffect(isFocusMode) {
+                val controller = WindowCompat.getInsetsController(window, view)
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                if (isFocusMode) {
+                    controller.hide(WindowInsetsCompat.Type.statusBars())
+                } else {
+                    controller.show(WindowInsetsCompat.Type.statusBars())
+                }
+                onDispose {
+                    controller.show(WindowInsetsCompat.Type.statusBars())
                 }
             }
 
@@ -131,6 +165,8 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
     val rawBookmarks by viewModel.rawBookmarks.collectAsStateWithLifecycle()
     val bookmarkCollections by viewModel.bookmarkCollections.collectAsStateWithLifecycle()
     val readingProgress by viewModel.readingProgress.collectAsStateWithLifecycle()
+    val quranReadingProgress by viewModel.quranReadingProgress.collectAsStateWithLifecycle()
+    val isSyncingSqlite by viewModel.isSyncingSqlite.collectAsStateWithLifecycle()
     val readerPreferences by viewModel.readerPreferences.collectAsStateWithLifecycle()
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
 
@@ -273,6 +309,7 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .semantics { liveRegion = LiveRegionMode.Polite }
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -307,7 +344,9 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                                     totalIndexedHadiths = totalIndexedHadiths,
                                     totalSurahs = surahs.size,
                                     totalAyahs = totalIndexedAyahs,
+                                    isSyncing = isSyncingSqlite,
                                     readingProgress = readingProgress,
+                                    quranReadingProgress = quranReadingProgress,
                                     onBookClick = { book -> viewModel.openBook(book) },
                                     onHadithClick = { hadith -> viewModel.openHadithFromAnywhere(hadith) },
                                     onOpenQuranClick = {
@@ -318,6 +357,9 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                                         if (book != null) {
                                             viewModel.jumpToHadithNumberInBook(book, progress.hadithNumber)
                                         }
+                                    },
+                                    onContinueQuranClick = { progress ->
+                                        viewModel.jumpToSurahAndAyah(progress.surahId, progress.ayahNumber)
                                     },
                                     onSearchBarClick = {
                                         viewModel.navigateToDestination(AppDestination.SEARCH)
@@ -349,6 +391,8 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                                     onSelectChapter = { book, chapter ->
                                         viewModel.openChapter(book, chapter)
                                     },
+                                    onPreviousChapter = { viewModel.openPreviousChapter() },
+                                    onNextChapter = { viewModel.openNextChapter() },
                                     onQuickJumpHadithNumber = { book, hadithNum ->
                                         viewModel.jumpToHadithNumberInBook(book, hadithNum)
                                     },
@@ -374,11 +418,20 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                                     selectedSurah = selectedSurah,
                                     ayahs = surahAyahs,
                                     highlightedAyahNumber = highlightedAyahNumber,
+                                    quranReadingProgress = quranReadingProgress,
                                     preferences = readerPreferences,
                                     isExpandedScreen = isExpandedScreen,
                                     isFocusMode = isFocusMode,
                                     onToggleFocusMode = { viewModel.toggleFocusMode() },
                                     onSelectSurah = { surah -> viewModel.openSurah(surah) },
+                                    onContinueQuranClick = { progress ->
+                                        viewModel.jumpToSurahAndAyah(progress.surahId, progress.ayahNumber)
+                                    },
+                                    onPreviousSurah = { viewModel.openPreviousSurah() },
+                                    onNextSurah = { viewModel.openNextSurah() },
+                                    onAyahViewed = { surah, ayahNum ->
+                                        viewModel.markSurahAyahAsRead(surah, ayahNum)
+                                    },
                                     onBackToSurahs = { viewModel.navigateBackInQuran() },
                                     onQuickJumpSurahAyah = { sId, aNum ->
                                         viewModel.jumpToSurahAndAyah(sId, aNum)
@@ -412,6 +465,9 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                                     },
                                     onAyahClick = { ayah ->
                                         viewModel.openAyahFromSearch(ayah)
+                                    },
+                                    onOpenHadithInReader = { hadith ->
+                                        viewModel.openHadithFromAnywhere(hadith)
                                     }
                                 )
                             }
@@ -429,6 +485,9 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                                     },
                                     onTopicClick = { topic ->
                                         viewModel.openTopicSearch(topic)
+                                    },
+                                    onOpenHadithInReader = { hadith ->
+                                        viewModel.openHadithFromAnywhere(hadith)
                                     }
                                 )
                             }

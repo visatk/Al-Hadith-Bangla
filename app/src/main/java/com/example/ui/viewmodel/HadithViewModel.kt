@@ -12,6 +12,7 @@ import com.example.data.local.entity.BookmarkEntity
 import com.example.data.local.entity.BookmarkedHadithWithDetail
 import com.example.data.local.entity.ChapterEntity
 import com.example.data.local.entity.HadithEntity
+import com.example.data.local.entity.QuranReadingProgress
 import com.example.data.local.entity.ReaderPreferences
 import com.example.data.local.entity.ReadingProgressEntity
 import com.example.data.local.entity.SectionEntity
@@ -24,11 +25,14 @@ import com.example.data.sqlite.SqliteAssetDataSource
 import com.example.ui.components.toEnglishDigits
 import com.example.ui.theme.ReaderThemeMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -49,18 +53,20 @@ enum class SearchScopeFilter(val labelBn: String) {
     QURAN_ONLY("শুধু আল-কুরআন")
 }
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class HadithViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = AppDatabase.getInstance(application)
     private val sqliteDataSource = SqliteAssetDataSource(application)
     private val quranDataSource = QuranJsonDataSource(application)
+    private val preferencesRepo = UserPreferencesRepository(application)
     private val repository = HadithRepository(
+        database = database,
         hadithDao = database.hadithDao(),
         sqliteAssetDataSource = sqliteDataSource,
-        quranJsonDataSource = quranDataSource
+        quranJsonDataSource = quranDataSource,
+        preferencesRepository = preferencesRepo
     )
-    private val preferencesRepo = UserPreferencesRepository(application)
 
     private val _currentDestination = MutableStateFlow(AppDestination.HOME)
     val currentDestination: StateFlow<AppDestination> = _currentDestination.asStateFlow()
@@ -145,23 +151,32 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val debouncedSearchQuery = _searchQuery
+        .debounce(200L)
+        .distinctUntilChanged()
+
     val searchResults: StateFlow<List<HadithEntity>> = combine(
-        _searchQuery,
+        debouncedSearchQuery,
         _searchBookFilter,
         _searchGradeFilter,
         _searchScopeFilter
     ) { query, bookId, gradeType, scope ->
-        if (scope == SearchScopeFilter.QURAN_ONLY) null else Triple(query.toEnglishDigits(), bookId, gradeType)
+        val normalized = query.trim().toEnglishDigits()
+        when {
+            scope == SearchScopeFilter.QURAN_ONLY -> null
+            normalized.isBlank() && bookId == null && gradeType == null -> null
+            else -> Triple(normalized, bookId, gradeType)
+        }
     }.flatMapLatest { params ->
         if (params == null) flowOf(emptyList())
         else repository.searchHadiths(params.first, params.second, params.third)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val quranSearchResults: StateFlow<List<AyahEntity>> = combine(
-        _searchQuery,
+        debouncedSearchQuery,
         _searchScopeFilter
     ) { query, scope ->
-        if (scope == SearchScopeFilter.HADITH_ONLY) null else query.toEnglishDigits()
+        if (scope == SearchScopeFilter.HADITH_ONLY) null else query.trim().toEnglishDigits()
     }.flatMapLatest { normalizedQuery ->
         if (normalizedQuery.isNullOrBlank()) flowOf(emptyList())
         else repository.searchAyahs(normalizedQuery)
@@ -177,6 +192,9 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val readingProgress: StateFlow<ReadingProgressEntity?> = repository.readingProgressFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val quranReadingProgress: StateFlow<QuranReadingProgress?> = preferencesRepo.quranReadingProgressFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val readerPreferences: StateFlow<ReaderPreferences> = preferencesRepo.readerPreferencesFlow
@@ -248,6 +266,26 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
         _currentDestination.value = AppDestination.BOOKS
     }
 
+    fun openPreviousChapter() {
+        val book = _selectedBook.value ?: return
+        val current = _selectedChapter.value ?: return
+        val list = chaptersForSelectedBook.value
+        val idx = list.indexOfFirst { it.id == current.id }
+        if (idx > 0) {
+            openChapter(book, list[idx - 1])
+        }
+    }
+
+    fun openNextChapter() {
+        val book = _selectedBook.value ?: return
+        val current = _selectedChapter.value ?: return
+        val list = chaptersForSelectedBook.value
+        val idx = list.indexOfFirst { it.id == current.id }
+        if (idx in 0 until list.lastIndex) {
+            openChapter(book, list[idx + 1])
+        }
+    }
+
     fun openHadithFromAnywhere(hadith: HadithEntity) {
         viewModelScope.launch {
             val book = books.value.firstOrNull { it.id == hadith.bookId } ?: return@launch
@@ -279,6 +317,35 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
         _selectedSurah.value = surah
         _highlightedAyahNumber.value = highlightAyahNumber
         _currentDestination.value = AppDestination.QURAN
+        markSurahAyahAsRead(surah, highlightAyahNumber ?: 1)
+    }
+
+    fun openPreviousSurah() {
+        val current = _selectedSurah.value ?: return
+        val list = surahs.value
+        val idx = list.indexOfFirst { it.id == current.id }
+        if (idx > 0) {
+            openSurah(list[idx - 1])
+        }
+    }
+
+    fun openNextSurah() {
+        val current = _selectedSurah.value ?: return
+        val list = surahs.value
+        val idx = list.indexOfFirst { it.id == current.id }
+        if (idx in 0 until list.lastIndex) {
+            openSurah(list[idx + 1])
+        }
+    }
+
+    fun markSurahAyahAsRead(surah: SurahEntity, ayahNumber: Int) {
+        viewModelScope.launch {
+            preferencesRepo.saveQuranReadingProgress(
+                surahId = surah.id,
+                surahNameBn = surah.nameBn,
+                ayahNumber = ayahNumber.coerceIn(1, surah.totalVerses.coerceAtLeast(1))
+            )
+        }
     }
 
     fun openAyahFromSearch(ayah: AyahEntity) {

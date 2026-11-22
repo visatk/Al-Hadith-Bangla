@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -18,36 +19,45 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
@@ -57,8 +67,8 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.local.entity.BookEntity
 import com.example.data.local.entity.HadithEntity
+import com.example.data.local.entity.QuranReadingProgress
 import com.example.data.local.entity.ReadingProgressEntity
-import com.example.data.local.entity.SqliteDatabaseFileReport
 import com.example.ui.components.IslamicGeometricDivider
 import com.example.ui.components.RubElHizbMedallion
 import com.example.ui.components.TahqiqGradeBadge
@@ -68,6 +78,7 @@ import com.example.ui.theme.AmiriArabicFontFamily
 import com.example.ui.theme.EmeraldDeep
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.GoldLight
+import java.util.Calendar
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -77,191 +88,287 @@ fun HomeScreen(
     totalIndexedHadiths: Int,
     totalSurahs: Int,
     totalAyahs: Int,
+    isSyncing: Boolean,
     readingProgress: ReadingProgressEntity?,
+    quranReadingProgress: QuranReadingProgress?,
     onBookClick: (BookEntity) -> Unit,
     onHadithClick: (HadithEntity) -> Unit,
     onOpenQuranClick: () -> Unit,
     onContinueReadingClick: (ReadingProgressEntity) -> Unit,
+    onContinueQuranClick: (QuranReadingProgress) -> Unit,
     onSearchBarClick: () -> Unit,
     onTopicClick: (String) -> Unit,
     onTypographySettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val featuredHadith = remember(allHadiths) {
-        allHadiths.firstOrNull { it.arabicText.isNotBlank() && it.banglaText.isNotBlank() }
-            ?: allHadiths.firstOrNull()
+    val haptic = LocalHapticFeedback.current
+    val dayOfYear = remember { Calendar.getInstance().get(Calendar.DAY_OF_YEAR) }
+    var shuffleOffset by remember { mutableIntStateOf(0) }
+
+    val featuredCandidates = remember(allHadiths) {
+        val rich = allHadiths.filter {
+            it.arabicText.isNotBlank() && it.banglaText.isNotBlank() && it.banglaText.length in 30..750
+        }
+        if (rich.isNotEmpty()) rich else allHadiths
+    }
+    val featuredHadith = remember(featuredCandidates, dayOfYear, shuffleOffset) {
+        if (featuredCandidates.isEmpty()) null
+        else featuredCandidates[(dayOfYear + shuffleOffset).mod(featuredCandidates.size)]
     }
 
     val popularTopics = remember {
         listOf("ঈমান", "সালাত", "ইলম", "ইখলাস", "আখলাক", "তাকওয়া", "পবিত্রতা", "দুআ ও যিকর")
     }
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("home_lazy_column"),
-        contentPadding = PaddingValues(bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
-    ) {
-        // 1. Atmospheric Islamic Arch Hero Banner + Search Trigger
-        item {
-            HeroSanctuaryHeader(
-                totalBooks = books.size,
-                totalSurahs = if (totalSurahs > 0) totalSurahs else 114,
-                totalIndexedHadiths = if (totalIndexedHadiths > 0) totalIndexedHadiths else books.sumOf { it.hadithCount },
-                onSearchBarClick = onSearchBarClick,
-                onTypographySettingsClick = onTypographySettingsClick
-            )
-        }
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val gridColumns = if (maxWidth >= 840.dp) 3 else 2
 
-        // 2. Continue Reading Card (সর্বশেষ পঠিত) right at top for instant focus
-        if (readingProgress != null) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag("home_lazy_column"),
+            contentPadding = PaddingValues(bottom = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            // 1. Atmospheric Islamic Arch Hero Banner + Search Trigger
             item {
-                ContinueReadingCard(
-                    progress = readingProgress,
-                    onClick = { onContinueReadingClick(readingProgress) },
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                HeroSanctuaryHeader(
+                    totalBooks = books.size,
+                    totalSurahs = if (totalSurahs > 0) totalSurahs else 114,
+                    totalIndexedHadiths = if (totalIndexedHadiths > 0) totalIndexedHadiths else books.sumOf { it.hadithCount },
+                    onSearchBarClick = onSearchBarClick,
+                    onTypographySettingsClick = onTypographySettingsClick
                 )
             }
-        }
 
-        // 3. Al-Quran Sanctuary Quick Access Banner
-        item {
-            AlQuranQuickAccessCard(
-                totalSurahs = if (totalSurahs > 0) totalSurahs else 114,
-                totalAyahs = if (totalAyahs > 0) totalAyahs else 6236,
-                onClick = onOpenQuranClick,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-
-        // 4. Daily Featured Hadith Showcase (আজকের নির্বাচিত হাদিস)
-        if (featuredHadith != null) {
-            item {
-                FeaturedHadithShowcaseCard(
-                    hadith = featuredHadith,
-                    onReadFullClick = { onHadithClick(featuredHadith) },
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-        }
-
-        // 5. Topic Explorer Chips (বিষয়ভিত্তিক হাদিস অন্বেষণ)
-        item {
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "বিষয়ভিত্তিক হাদিস",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold
+            // 1b. Serene first-launch indexing progress indicator
+            if (isSyncing && books.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 1040.dp)
+                            .padding(horizontal = 16.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
                         )
-                    )
-                    Text(
-                        text = "ট্যাপ করে খুঁজুন",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    )
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    popularTopics.forEach { topic ->
-                        AssistChip(
-                            onClick = { onTopicClick(topic) },
-                            label = {
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                strokeWidth = 3.dp
+                            )
+                            Column {
                                 Text(
-                                    text = topic,
-                                    style = MaterialTheme.typography.labelLarge
+                                    text = "বিশুদ্ধ হাদিস ও আল-কুরআন প্রস্তুত হচ্ছে…",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                                 )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = GoldAccent,
-                                    modifier = Modifier.size(16.dp)
+                                Text(
+                                    text = "প্রথমবার অফলাইন ডেটাবেস ইনডেক্স করা হচ্ছে, এরপর প্রতিবার তাৎক্ষণিক চালু হবে।",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 )
-                            },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            ),
-                            modifier = Modifier.testTag("topic_chip_$topic")
-                        )
+                            }
+                        }
                     }
                 }
             }
-        }
 
-        // 6. Primary Hadith Books Collection Header
-        item {
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                IslamicGeometricDivider(
+            // 2. Continue Reading Card (সর্বশেষ পঠিত হাদিস)
+            if (readingProgress != null) {
+                item {
+                    ContinueReadingCard(
+                        progress = readingProgress,
+                        onClick = { onContinueReadingClick(readingProgress) },
+                        modifier = Modifier
+                            .widthIn(max = 1040.dp)
+                            .padding(horizontal = 16.dp)
+                    )
+                }
+            }
+
+            // 2b. Continue Al-Quran Reading Card (সর্বশেষ পঠিত সূরা)
+            if (quranReadingProgress != null) {
+                item {
+                    ContinueQuranReadingCard(
+                        progress = quranReadingProgress,
+                        onClick = { onContinueQuranClick(quranReadingProgress) },
+                        modifier = Modifier
+                            .widthIn(max = 1040.dp)
+                            .padding(horizontal = 16.dp)
+                    )
+                }
+            }
+
+            // 3. Al-Quran Sanctuary Quick Access Banner
+            item {
+                AlQuranQuickAccessCard(
+                    totalSurahs = if (totalSurahs > 0) totalSurahs else 114,
+                    totalAyahs = if (totalAyahs > 0) totalAyahs else 6236,
+                    onClick = onOpenQuranClick,
+                    modifier = Modifier
+                        .widthIn(max = 1040.dp)
+                        .padding(horizontal = 16.dp)
+                )
+            }
+
+            // 4. Daily Featured Hadith Showcase (আজকের নির্বাচিত হাদিস) + Shuffle
+            if (featuredHadith != null) {
+                item {
+                    FeaturedHadithShowcaseCard(
+                        hadith = featuredHadith,
+                        canShuffle = featuredCandidates.size > 1,
+                        onShuffleClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            shuffleOffset += 1
+                        },
+                        onReadFullClick = { onHadithClick(featuredHadith) },
+                        modifier = Modifier
+                            .widthIn(max = 1040.dp)
+                            .padding(horizontal = 16.dp)
+                    )
+                }
+            }
+
+            // 5. Topic Explorer Chips (বিষয়ভিত্তিক হাদিস অন্বেষণ)
+            item {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(18.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .widthIn(max = 1040.dp)
+                        .padding(horizontal = 16.dp)
                 ) {
-                    Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                         Text(
-                            text = "বিশুদ্ধ হাদিস গ্রন্থসমূহ",
-                            style = MaterialTheme.typography.headlineMedium.copy(
+                            text = "বিষয়ভিত্তিক হাদিস",
+                            style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold
-                            )
+                            ),
+                            modifier = Modifier.semantics { heading() }
                         )
                         Text(
-                            text = "অধ্যায় ও পরিচ্ছেদ অনুযায়ী হাদিস অধ্যয়ন করুন",
+                            text = "ট্যাপ করে খুঁজুন",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
                     }
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.primaryContainer
+                    Spacer(modifier = Modifier.height(10.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "${books.size.toBanglaDigits()} টি গ্রন্থ",
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            ),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
+                        popularTopics.forEach { topic ->
+                            AssistChip(
+                                onClick = { onTopicClick(topic) },
+                                label = {
+                                    Text(
+                                        text = topic,
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = GoldAccent,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                modifier = Modifier.testTag("topic_chip_$topic")
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // 7. Books Grid (2 columns or responsive cards)
-        val chunkedBooks = books.chunked(2)
-        items(chunkedBooks.size) { rowIndex ->
-            val pair = chunkedBooks[rowIndex]
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                pair.forEach { book ->
-                    HadithBookGridCard(
-                        book = book,
-                        onClick = { onBookClick(book) },
-                        modifier = Modifier.weight(1f)
+            // 6. Primary Hadith Books Collection Header
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 1040.dp)
+                        .padding(horizontal = 16.dp)
+                ) {
+                    IslamicGeometricDivider(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(18.dp)
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "বিশুদ্ধ হাদিস গ্রন্থসমূহ",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                modifier = Modifier.semantics { heading() }
+                            )
+                            Text(
+                                text = "অধ্যায় ও পরিচ্ছেদ অনুযায়ী হাদিস অধ্যয়ন করুন",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = "${books.size.toBanglaDigits()} টি গ্রন্থ",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                ),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                 }
-                if (pair.size == 1) {
-                    Spacer(modifier = Modifier.weight(1f))
+            }
+
+            // 7. Books Grid (2 columns on phones, 3 columns on large tablets)
+            val chunkedBooks = books.chunked(gridColumns)
+            items(chunkedBooks.size) { rowIndex ->
+                val rowBooks = chunkedBooks[rowIndex]
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 1040.dp)
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    rowBooks.forEach { book ->
+                        HadithBookGridCard(
+                            book = book,
+                            onClick = { onBookClick(book) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    repeat(gridColumns - rowBooks.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
@@ -513,6 +620,7 @@ private fun ContinueReadingCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .clickable { onClick() }
+            .semantics(mergeDescendants = true) {}
             .testTag("continue_reading_card"),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
@@ -539,7 +647,7 @@ private fun ContinueReadingCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.History,
-                        contentDescription = "সর্বশেষ পঠিত",
+                        contentDescription = null,
                         tint = Color.White
                     )
                 }
@@ -577,8 +685,84 @@ private fun ContinueReadingCard(
 }
 
 @Composable
+private fun ContinueQuranReadingCard(
+    progress: QuranReadingProgress,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = GoldAccent.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(18.dp)
+            )
+            .clip(RoundedCornerShape(18.dp))
+            .clickable { onClick() }
+            .semantics(mergeDescendants = true) {}
+            .testTag("continue_quran_reading_card"),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(EmeraldDeep),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoStories,
+                        contentDescription = null,
+                        tint = GoldLight
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "সর্বশেষ তিলাওয়াতকৃত সূরা",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    )
+                    Text(
+                        text = "সূরা ${progress.surahNameBn} • আয়াত ${progress.ayahNumber.toBanglaDigits()}",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = "তিলাওয়াত চালিয়ে যান",
+                tint = MaterialTheme.colorScheme.secondary
+            )
+        }
+    }
+}
+
+@Composable
 private fun FeaturedHadithShowcaseCard(
     hadith: HadithEntity,
+    canShuffle: Boolean,
+    onShuffleClick: () -> Unit,
     onReadFullClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -605,7 +789,10 @@ private fun FeaturedHadithShowcaseCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Icon(
                         imageVector = Icons.Default.AutoAwesome,
                         contentDescription = null,
@@ -618,13 +805,30 @@ private fun FeaturedHadithShowcaseCard(
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
-                        )
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-                TahqiqGradeBadge(
-                    gradeBn = hadith.gradeBn,
-                    gradeType = hadith.gradeType
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TahqiqGradeBadge(
+                        gradeBn = hadith.gradeBn,
+                        gradeType = hadith.gradeType
+                    )
+                    if (canShuffle) {
+                        IconButton(
+                            onClick = onShuffleClick,
+                            modifier = Modifier.testTag("shuffle_daily_hadith_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "অন্য হাদিস দেখুন",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -663,12 +867,18 @@ private fun FeaturedHadithShowcaseCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "${hadith.narratorBn} • ${hadith.internationalNumber}",
+                    text = listOf(hadith.narratorBn, hadith.internationalNumber)
+                        .filter { it.isNotBlank() }
+                        .joinToString(" • "),
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
-                    )
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
+                Spacer(modifier = Modifier.width(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "ব্যাখ্যাসহ পড়ুন",
@@ -706,6 +916,7 @@ fun HadithBookGridCard(
             )
             .clip(RoundedCornerShape(20.dp))
             .clickable { onClick() }
+            .semantics(mergeDescendants = true) {}
             .testTag("book_card_${book.id}"),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(

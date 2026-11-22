@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.FindInPage
 import androidx.compose.material.icons.filled.Fullscreen
@@ -43,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,7 +61,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -96,6 +102,8 @@ fun BooksAndReaderScreen(
     onToggleFocusMode: () -> Unit,
     onSelectBook: (BookEntity) -> Unit,
     onSelectChapter: (BookEntity, ChapterEntity) -> Unit,
+    onPreviousChapter: () -> Unit,
+    onNextChapter: () -> Unit,
     onQuickJumpHadithNumber: (BookEntity, Int) -> Unit,
     onBackStep: () -> Boolean,
     onBookmarkClick: (HadithEntity) -> Unit,
@@ -135,6 +143,7 @@ fun BooksAndReaderScreen(
             ) {
                 val activeChapter = selectedChapter ?: chapters.firstOrNull()
                 if (activeChapter != null) {
+                    val chapterIdx = chapters.indexOfFirst { it.id == activeChapter.id }
                     HadithChapterReaderPane(
                         book = selectedBook,
                         chapter = activeChapter,
@@ -145,6 +154,10 @@ fun BooksAndReaderScreen(
                         highlightedHadithId = highlightedHadithId,
                         showBackButton = isFocusMode,
                         isFocusMode = isFocusMode,
+                        hasPreviousChapter = chapterIdx > 0,
+                        hasNextChapter = chapterIdx in 0 until chapters.lastIndex,
+                        onPreviousChapter = onPreviousChapter,
+                        onNextChapter = onNextChapter,
                         onToggleFocusMode = onToggleFocusMode,
                         onBack = { if (isFocusMode) onToggleFocusMode() else onBackStep() },
                         onOpenQuickJump = { showJumpDialog = true },
@@ -179,6 +192,7 @@ fun BooksAndReaderScreen(
                 )
             }
             else -> {
+                val chapterIdx = chapters.indexOfFirst { it.id == selectedChapter.id }
                 HadithChapterReaderPane(
                     book = selectedBook,
                     chapter = selectedChapter,
@@ -189,6 +203,10 @@ fun BooksAndReaderScreen(
                     highlightedHadithId = highlightedHadithId,
                     showBackButton = true,
                     isFocusMode = isFocusMode,
+                    hasPreviousChapter = chapterIdx > 0,
+                    hasNextChapter = chapterIdx in 0 until chapters.lastIndex,
+                    onPreviousChapter = onPreviousChapter,
+                    onNextChapter = onNextChapter,
                     onToggleFocusMode = onToggleFocusMode,
                     onBack = { onBackStep() },
                     onOpenQuickJump = { showJumpDialog = true },
@@ -235,13 +253,19 @@ private fun AllBooksCatalogPane(
             .fillMaxSize()
             .testTag("books_catalog_list"),
         contentPadding = PaddingValues(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Column {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 840.dp)
+            ) {
                 Text(
                     text = "হাদিস গ্রন্থসমূহ",
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.semantics { heading() }
                 )
                 Text(
                     text = "অধ্যায় ও পরিচ্ছেদ অনুযায়ী হাদিস অধ্যয়ন করতে যেকোনো গ্রন্থ নির্বাচন করুন",
@@ -271,6 +295,7 @@ private fun AllBooksCatalogPane(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .widthIn(max = 840.dp)
                     .border(
                         width = 1.dp,
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
@@ -278,6 +303,7 @@ private fun AllBooksCatalogPane(
                     )
                     .clip(RoundedCornerShape(20.dp))
                     .clickable { onSelectBook(book) }
+                    .semantics(mergeDescendants = true) {}
                     .testTag("catalog_book_item_${book.id}"),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -483,6 +509,7 @@ private fun ChapterListPane(
                         )
                         .clip(RoundedCornerShape(16.dp))
                         .clickable { onSelectChapter(chapter) }
+                        .semantics(mergeDescendants = true) {}
                         .testTag("chapter_item_${chapter.id}"),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
@@ -558,6 +585,10 @@ private fun HadithChapterReaderPane(
     highlightedHadithId: Int?,
     showBackButton: Boolean,
     isFocusMode: Boolean,
+    hasPreviousChapter: Boolean,
+    hasNextChapter: Boolean,
+    onPreviousChapter: () -> Unit,
+    onNextChapter: () -> Unit,
     onToggleFocusMode: () -> Unit,
     onBack: () -> Unit,
     onOpenQuickJump: () -> Unit,
@@ -569,6 +600,7 @@ private fun HadithChapterReaderPane(
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
     val sectionMap = remember(sections) { sections.associateBy { it.id } }
     val bookmarkMap = remember(bookmarks) { bookmarks.associateBy { it.hadithId } }
     val showScrollToTop by remember {
@@ -578,6 +610,12 @@ private fun HadithChapterReaderPane(
         derivedStateOf {
             if (hadiths.isEmpty()) 0f
             else ((listState.firstVisibleItemIndex + 1).toFloat() / hadiths.size.toFloat()).coerceIn(0.03f, 1f)
+        }
+    }
+
+    LaunchedEffect(chapter.id) {
+        if (highlightedHadithId == null) {
+            listState.scrollToItem(0)
         }
     }
 
@@ -629,11 +667,15 @@ private fun HadithChapterReaderPane(
                                         fontWeight = FontWeight.Bold
                                     ),
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.semantics { heading() }
                                 )
                             }
                             IconButton(
-                                onClick = onToggleFocusMode,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onToggleFocusMode()
+                                },
                                 modifier = Modifier.testTag("reader_focus_mode_button")
                             ) {
                                 Icon(
@@ -742,6 +784,53 @@ private fun HadithChapterReaderPane(
                                 onBookmarkClick = { onBookmarkClick(hadith) },
                                 onTopicClick = onTopicClick
                             )
+                        }
+                    }
+
+                    if (hasPreviousChapter || hasNextChapter) {
+                        item(key = "chapter_nav_footer") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .widthIn(max = 780.dp)
+                                    .padding(top = 6.dp, bottom = 28.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                if (hasPreviousChapter) {
+                                    OutlinedButton(
+                                        onClick = onPreviousChapter,
+                                        shape = RoundedCornerShape(14.dp),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("previous_chapter_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("পূর্ববর্তী অধ্যায়")
+                                    }
+                                }
+                                if (hasNextChapter) {
+                                    Button(
+                                        onClick = onNextChapter,
+                                        shape = RoundedCornerShape(14.dp),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("next_chapter_button")
+                                    ) {
+                                        Text("পরবর্তী অধ্যায়")
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

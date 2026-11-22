@@ -1,5 +1,6 @@
 package com.example.data.local.entity
 
+import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
@@ -7,6 +8,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.example.ui.theme.ReaderThemeMode
 
+@Immutable
 @Entity(tableName = "books")
 data class BookEntity(
     @PrimaryKey val id: Int,
@@ -22,6 +24,7 @@ data class BookEntity(
     @ColumnInfo(name = "source_file") val sourceFile: String = "bn_hadis-somvar.sqlite"
 )
 
+@Immutable
 @Entity(
     tableName = "chapters",
     indices = [Index(value = ["book_id"])]
@@ -36,6 +39,7 @@ data class ChapterEntity(
     @ColumnInfo(name = "hadith_count") val hadithCount: Int
 )
 
+@Immutable
 @Entity(
     tableName = "sections",
     indices = [Index(value = ["chapter_id"]), Index(value = ["book_id"])]
@@ -49,6 +53,7 @@ data class SectionEntity(
     @ColumnInfo(name = "preface_bn") val prefaceBn: String
 )
 
+@Immutable
 @Entity(
     tableName = "hadiths",
     indices = [
@@ -78,6 +83,7 @@ data class HadithEntity(
     @ColumnInfo(name = "topic_tags") val topicTags: String
 )
 
+@Immutable
 @Entity(tableName = "surahs")
 data class SurahEntity(
     @PrimaryKey val id: Int,
@@ -90,6 +96,7 @@ data class SurahEntity(
     @ColumnInfo(name = "total_verses") val totalVerses: Int
 )
 
+@Immutable
 @Entity(
     tableName = "ayahs",
     indices = [Index(value = ["surah_id"]), Index(value = ["ayah_number"])]
@@ -104,6 +111,7 @@ data class AyahEntity(
     @ColumnInfo(name = "bangla_translation") val banglaTranslation: String
 )
 
+@Immutable
 @Entity(tableName = "bookmark_collections")
 data class BookmarkCollectionEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
@@ -112,6 +120,7 @@ data class BookmarkCollectionEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis()
 )
 
+@Immutable
 @Entity(tableName = "bookmarks")
 data class BookmarkEntity(
     @PrimaryKey val hadithId: Int,
@@ -120,6 +129,7 @@ data class BookmarkEntity(
     @ColumnInfo(name = "saved_at") val savedAt: Long = System.currentTimeMillis()
 )
 
+@Immutable
 @Entity(tableName = "reading_progress")
 data class ReadingProgressEntity(
     @PrimaryKey val id: Int = 1,
@@ -132,6 +142,14 @@ data class ReadingProgressEntity(
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis()
 )
 
+@Immutable
+data class QuranReadingProgress(
+    val surahId: Int,
+    val surahNameBn: String,
+    val ayahNumber: Int
+)
+
+@Immutable
 data class BookmarkedHadithWithDetail(
     @Embedded val hadith: HadithEntity,
     @ColumnInfo(name = "collection_name") val collectionName: String,
@@ -139,6 +157,7 @@ data class BookmarkedHadithWithDetail(
     @ColumnInfo(name = "saved_at") val savedAt: Long
 )
 
+@Immutable
 data class SqliteDatabaseFileReport(
     val fileName: String,
     val originType: String, // "ASSETS_FOLDER", "QURAN_JSON", or "USER_IMPORTED"
@@ -152,6 +171,7 @@ data class SqliteDatabaseFileReport(
     val statusNoteBn: String
 )
 
+@Immutable
 data class ReaderPreferences(
     val arabicFontSizeSp: Float = 26f,
     val banglaFontSizeSp: Float = 17f,

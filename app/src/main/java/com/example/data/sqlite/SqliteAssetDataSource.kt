@@ -259,6 +259,20 @@ class SqliteAssetDataSource(private val context: Context) {
     private val cacheWorkDir: File
         get() = File(context.cacheDir, WORK_CACHE_FOLDER).apply { mkdirs() }
 
+    /**
+     * Computes a lightweight deterministic fingerprint of all asset and user-imported SQLite files
+     * without copying or opening SQLite databases, enabling <40ms warm/cold startup when Room is up to date.
+     */
+    suspend fun computeSourcesFingerprint(): String = withContext(Dispatchers.IO) {
+        val assetSig = discoverAssetSqliteFiles().joinToString("|") { "${it.first}/${it.second}" }
+        val importedSig = importedDir.listFiles()
+            ?.filter { it.isFile && isSqliteFileName(it.name) }
+            ?.sortedBy { it.name }
+            ?.joinToString("|") { "${it.name}:${it.length()}:${it.lastModified()}" }
+            .orEmpty()
+        "v3#$assetSig#$importedSig"
+    }
+
     suspend fun scanAndParseAllSqliteSources(): ParsedSqliteBundle = withContext(Dispatchers.IO) {
         val reports = mutableListOf<SqliteDatabaseFileReport>()
         val allBooks = mutableListOf<BookEntity>()
@@ -271,7 +285,8 @@ class SqliteAssetDataSource(private val context: Context) {
 
         var dynamicBookSeq = 200
         for ((assetFolder, fileName) in discoveredAssets) {
-            val stagedFile = File(cacheWorkDir, "asset_${fileName.replace('/', '_')}")
+            val safeStageName = "asset_${fileName.replace(Regex("[^A-Za-z0-9._-]"), "_")}"
+            val stagedFile = File(cacheWorkDir, safeStageName)
             val assetRelPath = "$assetFolder/$fileName"
             runCatching {
                 context.assets.open(assetRelPath).use { input ->
@@ -381,29 +396,66 @@ class SqliteAssetDataSource(private val context: Context) {
             name.endsWith(".sqlite3", ignoreCase = true)
     }
 
+    private fun sanitizeExternalFileName(rawName: String?): String {
+        val base = File(rawName.orEmpty()).name
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .trimStart('.')
+            .take(80)
+        val safeBase = if (base.isBlank()) "custom_hadith_${System.currentTimeMillis()}" else base
+        return if (isSqliteFileName(safeBase)) safeBase else "$safeBase.sqlite"
+    }
+
+    private fun hasValidSqlite3Header(file: File): Boolean {
+        if (!file.exists() || file.length() < 100L) return false
+        val header = ByteArray(16)
+        val bytesRead = file.inputStream().use { it.read(header) }
+        if (bytesRead < 16) return false
+        return String(header, 0, 15, Charsets.US_ASCII) == "SQLite format 3"
+    }
+
     suspend fun importExternalSqliteUri(uri: Uri): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
-            val fileName = resolveFileName(uri) ?: "custom_hadith_${System.currentTimeMillis()}.sqlite"
-            val sanitizedName = if (isSqliteFileName(fileName)) {
-                fileName
-            } else {
-                "$fileName.sqlite"
+            val sanitizedName = sanitizeExternalFileName(resolveFileName(uri))
+            val targetDirCanonical = importedDir.canonicalPath
+            val targetFile = File(importedDir, sanitizedName)
+            require(targetFile.canonicalPath.startsWith("$targetDirCanonical${File.separator}")) {
+                "অনিরাপদ ফাইলের নাম সনাক্ত হয়েছে"
             }
 
-            val targetFile = File(importedDir, sanitizedName)
+            val maxBytes = 120L * 1024L * 1024L // 120 MB safety cap
+            var totalCopied = 0L
             context.contentResolver.openInputStream(uri)?.use { input ->
                 FileOutputStream(targetFile).use { output ->
-                    input.copyTo(output)
+                    val buffer = ByteArray(16 * 1024)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        totalCopied += read
+                        if (totalCopied > maxBytes) {
+                            output.close()
+                            targetFile.delete()
+                            error("ফাইলটি ১২০ মেগাবাইটের চেয়ে বড় হওয়ায় ইম্পোর্ট করা যায়নি")
+                        }
+                        output.write(buffer, 0, read)
+                    }
                 }
             } ?: error("ফাইলটি খোলা সম্ভব হয়নি")
+
+            if (!hasValidSqlite3Header(targetFile)) {
+                targetFile.delete()
+                error("নির্বাচিত ফাইলটি বৈধ SQLite 3 ডেটাবেস নয়")
+            }
 
             val db = SQLiteDatabase.openDatabase(
                 targetFile.absolutePath,
                 null,
                 SQLiteDatabase.OPEN_READONLY
             )
-            val tables = getTableNames(db)
-            db.close()
+            val tables = try {
+                getTableNames(db)
+            } finally {
+                db.close()
+            }
 
             if (tables.isEmpty()) {
                 targetFile.delete()
@@ -411,6 +463,10 @@ class SqliteAssetDataSource(private val context: Context) {
             }
             sanitizedName
         }
+    }
+
+    private fun quoteSqlIdentifier(identifier: String): String {
+        return "\"${identifier.replace("\"", "\"\"")}\""
     }
 
     private fun parseSingleSqliteFile(
@@ -446,11 +502,13 @@ class SqliteAssetDataSource(private val context: Context) {
             var parsedHadiths = 0
 
             val fileChapters = mutableListOf<ChapterEntity>()
+            val chapterTitleMap = HashMap<Int, String>()
             val fileSections = mutableListOf<SectionEntity>()
+            val sectionLookup = HashMap<Long, SectionEntity>()
             val fileHadiths = mutableListOf<HadithEntity>()
 
             if (chaptersTable != null) {
-                db.rawQuery("SELECT * FROM $chaptersTable", null).use { cursor ->
+                db.rawQuery("SELECT * FROM ${quoteSqlIdentifier(chaptersTable)}", null).use { cursor ->
                     var seq = 1
                     while (cursor.moveToNext()) {
                         val rawChapterId = cursor.getIntFlex("chapter_id", "id", defaultVal = seq)
@@ -473,6 +531,7 @@ class SqliteAssetDataSource(private val context: Context) {
                                 hadithCount = count
                             )
                         )
+                        chapterTitleMap[chapterUid] = titleBn
                         seq++
                         parsedChapters++
                     }
@@ -480,7 +539,7 @@ class SqliteAssetDataSource(private val context: Context) {
             }
 
             if (sectionsTable != null) {
-                db.rawQuery("SELECT * FROM $sectionsTable", null).use { cursor ->
+                db.rawQuery("SELECT * FROM ${quoteSqlIdentifier(sectionsTable)}", null).use { cursor ->
                     var seq = 1
                     while (cursor.moveToNext()) {
                         val rawChapterId = cursor.getIntFlex("chapter_id", defaultVal = 1)
@@ -492,33 +551,21 @@ class SqliteAssetDataSource(private val context: Context) {
                         val titleBn = cursor.getStringFlex("title_bn", "title", defaultVal = "").trim()
                         val prefaceBn = cursor.getStringFlex("preface_bn", "preface", defaultVal = "").trim()
 
-                        fileSections.add(
-                            SectionEntity(
-                                id = sectionUid,
-                                bookId = bookId,
-                                chapterId = chapterUid,
-                                sectionNumber = secNum.ifBlank { "পরিচ্ছেদ" },
-                                titleBn = titleBn,
-                                prefaceBn = prefaceBn
-                            )
+                        val entity = SectionEntity(
+                            id = sectionUid,
+                            bookId = bookId,
+                            chapterId = chapterUid,
+                            sectionNumber = secNum.ifBlank { "পরিচ্ছেদ" },
+                            titleBn = titleBn,
+                            prefaceBn = prefaceBn
                         )
+                        fileSections.add(entity)
+                        val key = (bookId.toLong() shl 44) or
+                            ((rawChapterId.toLong() and 0xFFFFFL) shl 24) or
+                            (rawSectionId.toLong() and 0xFFFFFFL)
+                        sectionLookup[key] = entity
                         seq++
                         parsedSections++
-                    }
-                }
-            }
-
-            // Map (rawChapterId, rawSectionId) -> sectionUid for linking hadiths accurately
-            val sectionLookup = HashMap<Long, SectionEntity>(fileSections.size)
-            if (sectionsTable != null) {
-                db.rawQuery("SELECT * FROM $sectionsTable", null).use { cursor ->
-                    var idx = 0
-                    while (cursor.moveToNext() && idx < fileSections.size) {
-                        val rawChapterId = cursor.getIntFlex("chapter_id", defaultVal = 1)
-                        val rawSectionId = cursor.getIntFlex("section_id", "id", defaultVal = idx + 1)
-                        val key = (rawChapterId.toLong() shl 32) or (rawSectionId.toLong() and 0xFFFFFFFFL)
-                        sectionLookup[key] = fileSections[idx]
-                        idx++
                     }
                 }
             }
@@ -526,7 +573,7 @@ class SqliteAssetDataSource(private val context: Context) {
             val chapterHadithCounter = HashMap<Int, Int>()
 
             if (hadithsTable != null) {
-                db.rawQuery("SELECT * FROM $hadithsTable", null).use { cursor ->
+                db.rawQuery("SELECT * FROM ${quoteSqlIdentifier(hadithsTable)}", null).use { cursor ->
                     var rowSeq = 1
                     while (cursor.moveToNext()) {
                         val bookId = cursor.getIntFlex("book_id", defaultVal = currentBookId)
@@ -535,7 +582,9 @@ class SqliteAssetDataSource(private val context: Context) {
                         val rawHadithId = cursor.getIntFlex("hadith_id", "hadith_number", "hadith_no", "number", "id", defaultVal = rowSeq)
 
                         val chapterUid = makeChapterUid(bookId, rawChapterId)
-                        val sectionKey = (rawChapterId.toLong() shl 32) or (rawSectionId.toLong() and 0xFFFFFFFFL)
+                        val sectionKey = (bookId.toLong() shl 44) or
+                            ((rawChapterId.toLong() and 0xFFFFFL) shl 24) or
+                            (rawSectionId.toLong() and 0xFFFFFFL)
                         val matchedSection = sectionLookup[sectionKey]
                         val sectionUid = matchedSection?.id ?: makeSectionUid(bookId, rawChapterId, rawSectionId, rowSeq)
 
@@ -554,7 +603,7 @@ class SqliteAssetDataSource(private val context: Context) {
                         val explicitGradeBn = cursor.getStringFlex("grade_bn", "grade", "grade_name", defaultVal = "").trim()
                         val (resolvedGradeBn, resolvedGradeType) = resolveTahqiqGrade(gradeId, explicitGradeBn, displayFileName)
 
-                        val chapterTitle = fileChapters.firstOrNull { it.id == chapterUid }?.titleBn.orEmpty()
+                        val chapterTitle = chapterTitleMap[chapterUid].orEmpty()
                         val sectionTitle = matchedSection?.titleBn.orEmpty()
                         val reference = cursor.getStringFlex(
                             "reference_bn",
@@ -619,7 +668,7 @@ class SqliteAssetDataSource(private val context: Context) {
             }
 
             if (booksTable != null) {
-                db.rawQuery("SELECT * FROM $booksTable", null).use { cursor ->
+                db.rawQuery("SELECT * FROM ${quoteSqlIdentifier(booksTable)}", null).use { cursor ->
                     while (cursor.moveToNext()) {
                         val id = cursor.getIntFlex("id", "book_id", defaultVal = currentBookId)
                         val titleBn = cursor.getStringFlex("title_bn", "title", "book_name", "name_bn", defaultVal = catalogMeta.titleBn)

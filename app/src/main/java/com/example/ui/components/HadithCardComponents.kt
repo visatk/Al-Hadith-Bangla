@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.ContentCopy
@@ -59,8 +60,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
@@ -85,10 +90,14 @@ fun ScholarHadithCard(
     isHighlighted: Boolean = false,
     onBookmarkClick: () -> Unit,
     onTopicClick: ((String) -> Unit)? = null,
+    onOpenInReader: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var explanationExpanded by remember { mutableStateOf(preferences.showExplanation) }
+    val haptic = LocalHapticFeedback.current
+    var explanationExpanded by remember(hadith.id, preferences.showExplanation) {
+        mutableStateOf(preferences.showExplanation)
+    }
 
     val borderColor = if (isHighlighted) {
         GoldAccent
@@ -357,19 +366,39 @@ fun ScholarHadithCard(
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (onOpenInReader != null) {
+                        IconButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onOpenInReader()
+                            },
+                            modifier = Modifier.testTag("open_in_reader_button_${hadith.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                contentDescription = "অধ্যায়ে পড়ুন",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
                     IconButton(
-                        onClick = onBookmarkClick,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onBookmarkClick()
+                        },
                         modifier = Modifier.testTag("bookmark_button_${hadith.id}")
                     ) {
                         Icon(
                             imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                            contentDescription = "বুকমার্ক করুন",
+                            contentDescription = if (isBookmarked) "বুকমার্ক সম্পাদনা করুন" else "বুকমার্ক করুন",
                             tint = if (isBookmarked) GoldAccent else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
                     IconButton(
                         onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             copyHadithToClipboard(context, hadith)
                         },
                         modifier = Modifier.testTag("copy_button_${hadith.id}")
@@ -408,7 +437,9 @@ fun formatHadithForShare(hadith: HadithEntity): String {
             appendLine(hadith.arabicText)
             appendLine()
         }
-        appendLine("${hadith.narratorBn} হতে বর্ণিত:")
+        if (hadith.narratorBn.isNotBlank()) {
+            appendLine("${hadith.narratorBn} হতে বর্ণিত:")
+        }
         appendLine(hadith.banglaText)
         if (hadith.explanationBn.isNotBlank()) {
             appendLine()
@@ -420,20 +451,29 @@ fun formatHadithForShare(hadith: HadithEntity): String {
 }
 
 fun copyHadithToClipboard(context: Context, hadith: HadithEntity) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val clip = ClipData.newPlainText("Hadith Bangla", formatHadithForShare(hadith))
-    clipboard.setPrimaryClip(clip)
-    Toast.makeText(context, "হাদিসটি ক্লিপবোর্ডে কপি করা হয়েছে", Toast.LENGTH_SHORT).show()
+    runCatching {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            ?: error("Clipboard unavailable")
+        val clip = ClipData.newPlainText("Hadith Bangla", formatHadithForShare(hadith))
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(context, "হাদিসটি ক্লিপবোর্ডে কপি করা হয়েছে", Toast.LENGTH_SHORT).show()
+    }.onFailure {
+        Toast.makeText(context, "কপি করা সম্ভব হয়নি", Toast.LENGTH_SHORT).show()
+    }
 }
 
 fun shareHadithIntent(context: Context, hadith: HadithEntity) {
-    val sendIntent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, hadith.referenceBn)
-        putExtra(Intent.EXTRA_TEXT, formatHadithForShare(hadith))
+    runCatching {
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, hadith.referenceBn)
+            putExtra(Intent.EXTRA_TEXT, formatHadithForShare(hadith))
+        }
+        val chooser = Intent.createChooser(sendIntent, "হাদিস শেয়ার করুন")
+        context.startActivity(chooser)
+    }.onFailure {
+        Toast.makeText(context, "শেয়ার করার অ্যাপ পাওয়া যায়নি", Toast.LENGTH_SHORT).show()
     }
-    val chooser = Intent.createChooser(sendIntent, "হাদিস শেয়ার করুন")
-    context.startActivity(chooser)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -476,7 +516,8 @@ fun ReaderTypographyBottomSheet(
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
-                )
+                ),
+                modifier = Modifier.semantics { heading() }
             )
             Text(
                 text = "মনোযোগ ধরে রাখতে ও চোখের আরামের জন্য ফন্ট, লাইন স্পেসিং ও থিম কাস্টমাইজ করুন",
@@ -484,6 +525,59 @@ fun ReaderTypographyBottomSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Live Typography Preview Card
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = 1.dp,
+                        color = GoldAccent.copy(alpha = 0.35f),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .testTag("typography_live_preview_card")
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = "লাইভ প্রিভিউ",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    if (preferences.showArabic) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        val previewArabic = "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ"
+                            .stripArabicTashkeel(preferences.showTashkeel)
+                        Text(
+                            text = previewArabic,
+                            style = MaterialTheme.typography.displayMedium.copy(
+                                fontFamily = AmiriArabicFontFamily,
+                                fontSize = preferences.arabicFontSizeSp.sp,
+                                lineHeight = (preferences.arabicFontSizeSp * (preferences.lineHeightMultiplier + 0.12f)).sp,
+                                textAlign = TextAlign.Right,
+                                textDirection = TextDirection.Rtl,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "নিশ্চয়ই সকল আমল নিয়তের উপর নির্ভরশীল এবং প্রত্যেকে তাই পাবে যা সে নিয়ত করে।",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontFamily = HindSiliguriBanglaFontFamily,
+                            fontSize = preferences.banglaFontSizeSp.sp,
+                            lineHeight = (preferences.banglaFontSizeSp * preferences.lineHeightMultiplier).sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
