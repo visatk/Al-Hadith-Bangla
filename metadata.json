@@ -1,0 +1,6 @@
+{
+  "name": "আল হাদিস বাংলা",
+  "description": "আধুনিক, হালকা এবং প্রিমিয়াম আর্কিটেকচারের বাংলা হাদিস সংকলন ও গবেষণা অ্যাপ (.sqlite ডেটাবেস চালিত)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
