@@ -155,9 +155,12 @@ data class SqliteDatabaseFileReport(
 data class ReaderPreferences(
     val arabicFontSizeSp: Float = 26f,
     val banglaFontSizeSp: Float = 17f,
+    val lineHeightMultiplier: Float = 1.65f,
     val showArabic: Boolean = true,
-    val showTransliteration: Boolean = true,
+    val showTransliteration: Boolean = false,
     val showExplanation: Boolean = true,
     val showTashkeel: Boolean = true,
+    val eyeCareWarmFilter: Float = 0.0f, // 0.0f..0.28f amber blue-light filter
+    val keepScreenOnWhileReading: Boolean = true,
     val themeMode: ReaderThemeMode = ReaderThemeMode.MANUSCRIPT_LIGHT
 )

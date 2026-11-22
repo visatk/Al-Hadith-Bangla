@@ -40,8 +40,7 @@ enum class AppDestination(val titleBn: String) {
     BOOKS("হাদিস গ্রন্থ"),
     QURAN("আল-কুরআন"),
     SEARCH("অনুসন্ধান"),
-    BOOKMARKS("সংগ্রহ"),
-    SQLITE_STUDIO("ডেটাবেস")
+    BOOKMARKS("সংগ্রহ")
 }
 
 enum class SearchScopeFilter(val labelBn: String) {
@@ -65,6 +64,9 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _currentDestination = MutableStateFlow(AppDestination.HOME)
     val currentDestination: StateFlow<AppDestination> = _currentDestination.asStateFlow()
+
+    private val _isFocusMode = MutableStateFlow(false)
+    val isFocusMode: StateFlow<Boolean> = _isFocusMode.asStateFlow()
 
     private val _selectedBook = MutableStateFlow<BookEntity?>(null)
     val selectedBook: StateFlow<BookEntity?> = _selectedBook.asStateFlow()
@@ -218,14 +220,24 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
 
     fun navigateToDestination(destination: AppDestination) {
         _currentDestination.value = destination
+        _isFocusMode.value = false
         if (destination != AppDestination.BOOKS) {
             _selectedChapter.value = null
         }
     }
 
+    fun toggleFocusMode() {
+        _isFocusMode.value = !_isFocusMode.value
+    }
+
+    fun setFocusMode(enabled: Boolean) {
+        _isFocusMode.value = enabled
+    }
+
     fun openBook(book: BookEntity) {
         _selectedBook.value = book
         _selectedChapter.value = null
+        _isFocusMode.value = false
         _currentDestination.value = AppDestination.BOOKS
     }
 
@@ -288,6 +300,10 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun navigateBackInQuran(): Boolean {
+        if (_isFocusMode.value) {
+            _isFocusMode.value = false
+            return true
+        }
         return if (_selectedSurah.value != null) {
             _selectedSurah.value = null
             _highlightedAyahNumber.value = null
@@ -298,6 +314,10 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun navigateBackInBooks(): Boolean {
+        if (_isFocusMode.value) {
+            _isFocusMode.value = false
+            return true
+        }
         return when {
             _selectedChapter.value != null -> {
                 _selectedChapter.value = null
@@ -317,6 +337,7 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
         _searchBookFilter.value = null
         _searchGradeFilter.value = null
         _searchScopeFilter.value = SearchScopeFilter.ALL
+        _isFocusMode.value = false
         _currentDestination.value = AppDestination.SEARCH
     }
 
@@ -369,13 +390,25 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // Reader Typography & Theme Controls
+    // Reader Typography, Ergonomics & Theme Controls
     fun setArabicFontSize(sizeSp: Float) {
         viewModelScope.launch { preferencesRepo.updateArabicFontSize(sizeSp) }
     }
 
     fun setBanglaFontSize(sizeSp: Float) {
         viewModelScope.launch { preferencesRepo.updateBanglaFontSize(sizeSp) }
+    }
+
+    fun setLineHeightMultiplier(multiplier: Float) {
+        viewModelScope.launch { preferencesRepo.updateLineHeightMultiplier(multiplier) }
+    }
+
+    fun setEyeCareWarmFilter(alpha: Float) {
+        viewModelScope.launch { preferencesRepo.updateEyeCareWarmFilter(alpha) }
+    }
+
+    fun setKeepScreenOn(enabled: Boolean) {
+        viewModelScope.launch { preferencesRepo.toggleKeepScreenOn(enabled) }
     }
 
     fun setShowArabic(show: Boolean) {

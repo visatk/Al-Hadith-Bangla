@@ -18,10 +18,13 @@ class UserPreferencesRepository(private val context: Context) {
     private object Keys {
         val ARABIC_FONT_SIZE = floatPreferencesKey("arabic_font_size_sp")
         val BANGLA_FONT_SIZE = floatPreferencesKey("bangla_font_size_sp")
+        val LINE_HEIGHT_MULTIPLIER = floatPreferencesKey("line_height_multiplier")
         val SHOW_ARABIC = booleanPreferencesKey("show_arabic")
         val SHOW_TRANSLITERATION = booleanPreferencesKey("show_transliteration")
         val SHOW_EXPLANATION = booleanPreferencesKey("show_explanation")
         val SHOW_TASHKEEL = booleanPreferencesKey("show_tashkeel")
+        val EYE_CARE_WARM_FILTER = floatPreferencesKey("eye_care_warm_filter")
+        val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on_reading")
         val THEME_MODE = stringPreferencesKey("reader_theme_mode")
     }
 
@@ -33,10 +36,13 @@ class UserPreferencesRepository(private val context: Context) {
         ReaderPreferences(
             arabicFontSizeSp = prefs[Keys.ARABIC_FONT_SIZE] ?: 26f,
             banglaFontSizeSp = prefs[Keys.BANGLA_FONT_SIZE] ?: 17f,
+            lineHeightMultiplier = prefs[Keys.LINE_HEIGHT_MULTIPLIER] ?: 1.65f,
             showArabic = prefs[Keys.SHOW_ARABIC] ?: true,
-            showTransliteration = prefs[Keys.SHOW_TRANSLITERATION] ?: true,
+            showTransliteration = prefs[Keys.SHOW_TRANSLITERATION] ?: false,
             showExplanation = prefs[Keys.SHOW_EXPLANATION] ?: true,
             showTashkeel = prefs[Keys.SHOW_TASHKEEL] ?: true,
+            eyeCareWarmFilter = prefs[Keys.EYE_CARE_WARM_FILTER] ?: 0.0f,
+            keepScreenOnWhileReading = prefs[Keys.KEEP_SCREEN_ON] ?: true,
             themeMode = themeMode
         )
     }
@@ -47,6 +53,10 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun updateBanglaFontSize(sizeSp: Float) {
         context.dataStore.edit { it[Keys.BANGLA_FONT_SIZE] = sizeSp.coerceIn(14f, 26f) }
+    }
+
+    suspend fun updateLineHeightMultiplier(multiplier: Float) {
+        context.dataStore.edit { it[Keys.LINE_HEIGHT_MULTIPLIER] = multiplier.coerceIn(1.4f, 2.1f) }
     }
 
     suspend fun toggleShowArabic(enabled: Boolean) {
@@ -63,6 +73,14 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun toggleShowTashkeel(enabled: Boolean) {
         context.dataStore.edit { it[Keys.SHOW_TASHKEEL] = enabled }
+    }
+
+    suspend fun updateEyeCareWarmFilter(intensity: Float) {
+        context.dataStore.edit { it[Keys.EYE_CARE_WARM_FILTER] = intensity.coerceIn(0f, 0.28f) }
+    }
+
+    suspend fun toggleKeepScreenOn(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.KEEP_SCREEN_ON] = enabled }
     }
 
     suspend fun setThemeMode(mode: ReaderThemeMode) {

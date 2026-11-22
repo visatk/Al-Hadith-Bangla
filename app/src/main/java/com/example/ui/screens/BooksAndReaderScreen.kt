@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -27,6 +29,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.FindInPage
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
@@ -37,6 +41,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -45,6 +50,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,6 +92,8 @@ fun BooksAndReaderScreen(
     preferences: ReaderPreferences,
     highlightedHadithId: Int?,
     isExpandedScreen: Boolean,
+    isFocusMode: Boolean,
+    onToggleFocusMode: () -> Unit,
     onSelectBook: (BookEntity) -> Unit,
     onSelectChapter: (BookEntity, ChapterEntity) -> Unit,
     onQuickJumpHadithNumber: (BookEntity, Int) -> Unit,
@@ -98,24 +106,28 @@ fun BooksAndReaderScreen(
 ) {
     var showJumpDialog by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = selectedBook != null || selectedChapter != null) {
+    BackHandler(enabled = selectedBook != null || selectedChapter != null || isFocusMode) {
         onBackStep()
     }
 
     if (isExpandedScreen && selectedBook != null) {
         Row(modifier = modifier.fillMaxSize()) {
-            ChapterListPane(
-                book = selectedBook,
-                chapters = chapters,
-                selectedChapterId = selectedChapter?.id,
-                onSelectChapter = { ch -> onSelectChapter(selectedBook, ch) },
-                onOpenQuickJump = { showJumpDialog = true },
-                onBackToBooks = { onBackStep() },
-                modifier = Modifier
-                    .width(340.dp)
-                    .fillMaxHeight()
-            )
-            VerticalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            AnimatedVisibility(visible = !isFocusMode) {
+                Row(modifier = Modifier.fillMaxHeight()) {
+                    ChapterListPane(
+                        book = selectedBook,
+                        chapters = chapters,
+                        selectedChapterId = selectedChapter?.id,
+                        onSelectChapter = { ch -> onSelectChapter(selectedBook, ch) },
+                        onOpenQuickJump = { showJumpDialog = true },
+                        onBackToBooks = { onBackStep() },
+                        modifier = Modifier
+                            .width(340.dp)
+                            .fillMaxHeight()
+                    )
+                    VerticalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                }
+            }
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -131,8 +143,10 @@ fun BooksAndReaderScreen(
                         bookmarks = bookmarks,
                         preferences = preferences,
                         highlightedHadithId = highlightedHadithId,
-                        showBackButton = false,
-                        onBack = {},
+                        showBackButton = isFocusMode,
+                        isFocusMode = isFocusMode,
+                        onToggleFocusMode = onToggleFocusMode,
+                        onBack = { if (isFocusMode) onToggleFocusMode() else onBackStep() },
                         onOpenQuickJump = { showJumpDialog = true },
                         onBookmarkClick = onBookmarkClick,
                         onTopicClick = onTopicClick,
@@ -174,6 +188,8 @@ fun BooksAndReaderScreen(
                     preferences = preferences,
                     highlightedHadithId = highlightedHadithId,
                     showBackButton = true,
+                    isFocusMode = isFocusMode,
+                    onToggleFocusMode = onToggleFocusMode,
                     onBack = { onBackStep() },
                     onOpenQuickJump = { showJumpDialog = true },
                     onBookmarkClick = onBookmarkClick,
@@ -350,11 +366,10 @@ private fun AllBooksCatalogPane(
                             }
                         }
 
-                        Text(
-                            text = book.sourceFile,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "গ্রন্থ খুলুন",
+                            tint = accentColor
                         )
                     }
                 }
@@ -542,6 +557,8 @@ private fun HadithChapterReaderPane(
     preferences: ReaderPreferences,
     highlightedHadithId: Int?,
     showBackButton: Boolean,
+    isFocusMode: Boolean,
+    onToggleFocusMode: () -> Unit,
     onBack: () -> Unit,
     onOpenQuickJump: () -> Unit,
     onBookmarkClick: (HadithEntity) -> Unit,
@@ -555,7 +572,13 @@ private fun HadithChapterReaderPane(
     val sectionMap = remember(sections) { sections.associateBy { it.id } }
     val bookmarkMap = remember(bookmarks) { bookmarks.associateBy { it.hadithId } }
     val showScrollToTop by remember {
-        androidx.compose.runtime.derivedStateOf { listState.firstVisibleItemIndex > 3 }
+        derivedStateOf { listState.firstVisibleItemIndex > 3 }
+    }
+    val chapterProgress by remember(hadiths.size) {
+        derivedStateOf {
+            if (hadiths.isEmpty()) 0f
+            else ((listState.firstVisibleItemIndex + 1).toFloat() / hadiths.size.toFloat()).coerceIn(0.03f, 1f)
+        }
     }
 
     LaunchedEffect(hadiths, highlightedHadithId) {
@@ -576,80 +599,103 @@ private fun HadithChapterReaderPane(
                 tonalElevation = 3.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (showBackButton) {
+                Column {
+                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (showBackButton) {
+                                IconButton(
+                                    onClick = onBack,
+                                    modifier = Modifier.testTag("reader_back_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "অধ্যায় তালিকায় ফিরুন"
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "${book.titleBn} • অধ্যায় ${chapter.chapterNumber.toBanglaDigits()}",
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                )
+                                Text(
+                                    text = chapter.titleBn,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                             IconButton(
-                                onClick = onBack,
-                                modifier = Modifier.testTag("reader_back_button")
+                                onClick = onToggleFocusMode,
+                                modifier = Modifier.testTag("reader_focus_mode_button")
                             ) {
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "অধ্যায় তালিকায় ফিরুন"
+                                    imageVector = if (isFocusMode) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                    contentDescription = if (isFocusMode) "মনোযোগ মোড বন্ধ করুন" else "মনোযোগ মোড চালু করুন",
+                                    tint = if (isFocusMode) GoldAccent else MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            IconButton(
+                                onClick = onOpenQuickJump,
+                                modifier = Modifier.testTag("reader_quick_jump_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FindInPage,
+                                    contentDescription = "হাদিস নম্বর জাম্প",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            IconButton(
+                                onClick = onOpenTypographySheet,
+                                modifier = Modifier.testTag("reader_typography_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = "ফন্ট ও থিম সেটিংস",
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "${book.titleBn} • অধ্যায় ${chapter.chapterNumber.toBanglaDigits()}",
-                                style = MaterialTheme.typography.labelLarge.copy(
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            )
-                            Text(
-                                text = chapter.titleBn,
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        IconButton(
-                            onClick = onOpenQuickJump,
-                            modifier = Modifier.testTag("reader_quick_jump_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FindInPage,
-                                contentDescription = "হাদিস নম্বর জাম্প",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        IconButton(
-                            onClick = onOpenTypographySheet,
-                            modifier = Modifier.testTag("reader_typography_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = "ফন্ট ও থিম সেটিংস",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+
+                        AnimatedVisibility(visible = !isFocusMode && hadiths.size > 1) {
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(top = 4.dp)
+                            ) {
+                                items(hadiths.size, key = { hadiths[it].id }, contentType = { "hadith_jump_chip" }) { index ->
+                                    val h = hadiths[index]
+                                    AssistChip(
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                listState.animateScrollToItem(index)
+                                            }
+                                            onHadithViewed(h)
+                                        },
+                                        label = {
+                                            Text("হাদিস ${h.hadithNumber.toBanglaDigits()}")
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
 
                     if (hadiths.size > 1) {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(top = 4.dp)
-                        ) {
-                            items(hadiths.size, key = { hadiths[it].id }, contentType = { "hadith_jump_chip" }) { index ->
-                                val h = hadiths[index]
-                                AssistChip(
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            listState.animateScrollToItem(index)
-                                        }
-                                        onHadithViewed(h)
-                                    },
-                                    label = {
-                                        Text("হাদিস ${h.hadithNumber.toBanglaDigits()}")
-                                    }
-                                )
-                            }
-                        }
+                        LinearProgressIndicator(
+                            progress = { chapterProgress },
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(3.dp)
+                        )
                     }
                 }
             }
@@ -663,6 +709,7 @@ private fun HadithChapterReaderPane(
                         .fillMaxSize()
                         .testTag("hadith_reader_lazy_column"),
                     contentPadding = PaddingValues(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(
@@ -675,7 +722,12 @@ private fun HadithChapterReaderPane(
                         val section = if (hadith.sectionId != prevSectionId) sectionMap[hadith.sectionId] else null
                         val bookmark = bookmarkMap[hadith.id]
 
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 780.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
                             if (section != null && (section.titleBn.isNotBlank() || section.prefaceBn.isNotBlank())) {
                                 SectionPrefaceBanner(section = section)
                             }
@@ -696,7 +748,7 @@ private fun HadithChapterReaderPane(
             }
         }
 
-        androidx.compose.animation.AnimatedVisibility(
+        AnimatedVisibility(
             visible = showScrollToTop,
             modifier = Modifier
                 .align(Alignment.BottomEnd)

@@ -21,8 +21,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
@@ -176,7 +178,7 @@ fun ScholarHadithCard(
                             style = MaterialTheme.typography.displayMedium.copy(
                                 fontFamily = AmiriArabicFontFamily,
                                 fontSize = preferences.arabicFontSizeSp.sp,
-                                lineHeight = (preferences.arabicFontSizeSp * 1.72f).sp,
+                                lineHeight = (preferences.arabicFontSizeSp * (preferences.lineHeightMultiplier + 0.12f)).sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 textAlign = TextAlign.Right,
                                 textDirection = TextDirection.Rtl
@@ -189,66 +191,42 @@ fun ScholarHadithCard(
             }
 
             // 3. Narrator (রাবী) Badge
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(GoldAccent)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "${hadith.narratorBn} হতে বর্ণিত:",
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        color = MaterialTheme.colorScheme.secondary,
-                        fontWeight = FontWeight.SemiBold
+            if (hadith.narratorBn.isNotBlank()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(GoldAccent)
                     )
-                )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "${hadith.narratorBn} হতে বর্ণিত:",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            color = MaterialTheme.colorScheme.secondary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                }
             }
 
-            // 4. Bangla Translation (Selectable for scholarly study)
+            // 4. Bangla Translation (Selectable for scholarly study, ergonomic line spacing)
             androidx.compose.foundation.text.selection.SelectionContainer {
                 Text(
                     text = hadith.banglaText,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontFamily = HindSiliguriBanglaFontFamily,
                         fontSize = preferences.banglaFontSizeSp.sp,
-                        lineHeight = (preferences.banglaFontSizeSp * 1.62f).sp,
+                        lineHeight = (preferences.banglaFontSizeSp * preferences.lineHeightMultiplier).sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 )
             }
 
-            // 5. Optional Transliteration (উচ্চারণ)
-            if (preferences.showTransliteration && hadith.transliterationBn.isNotBlank()) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = "বাংলা উচ্চারণ:",
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = hadith.transliterationBn,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        )
-                    }
-                }
-            }
-
-            // 6. Personal Study Note (if saved in bookmarks)
+            // 5. Personal Study Note (if saved in bookmarks)
             if (!savedPersonalNote.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Surface(
@@ -274,7 +252,7 @@ fun ScholarHadithCard(
                 }
             }
 
-            // 7. Scholarly Commentary / Explanation (তাহকীক ও ব্যাখ্যা)
+            // 6. Scholarly Commentary / Explanation (তাহকীক ও ব্যাখ্যা)
             if (hadith.explanationBn.isNotBlank()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Surface(
@@ -324,7 +302,7 @@ fun ScholarHadithCard(
                                     text = hadith.explanationBn,
                                     style = MaterialTheme.typography.bodyMedium.copy(
                                         fontSize = (preferences.banglaFontSizeSp - 1.5f).coerceAtLeast(13f).sp,
-                                        lineHeight = ((preferences.banglaFontSizeSp - 1.5f) * 1.55f).sp,
+                                        lineHeight = ((preferences.banglaFontSizeSp - 1.5f) * preferences.lineHeightMultiplier).sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 )
@@ -334,7 +312,7 @@ fun ScholarHadithCard(
                 }
             }
 
-            // 8. Topic Tags
+            // 7. Topic Tags
             val tags = remember(hadith.topicTags) {
                 hadith.topicTags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             }
@@ -363,7 +341,7 @@ fun ScholarHadithCard(
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
             )
 
-            // 9. Footer Reference + Action Buttons (Minimum 48dp touch targets)
+            // 8. Footer Reference + Action Buttons (Minimum 48dp touch targets)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -464,13 +442,25 @@ fun ReaderTypographyBottomSheet(
     preferences: ReaderPreferences,
     onArabicSizeChange: (Float) -> Unit,
     onBanglaSizeChange: (Float) -> Unit,
+    onLineHeightChange: (Float) -> Unit,
+    onEyeCareFilterChange: (Float) -> Unit,
+    onToggleKeepScreenOn: (Boolean) -> Unit,
     onToggleArabic: (Boolean) -> Unit,
-    onToggleTransliteration: (Boolean) -> Unit,
     onToggleExplanation: (Boolean) -> Unit,
     onToggleTashkeel: (Boolean) -> Unit,
     onThemeModeChange: (ReaderThemeMode) -> Unit,
+    onImportSqliteDatabase: ((android.net.Uri) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
+    val dbFilePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            onImportSqliteDatabase?.invoke(uri)
+            onDismiss()
+        }
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface
@@ -478,17 +468,18 @@ fun ReaderTypographyBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
             Text(
-                text = "পাঠ ও ফন্ট কাস্টমাইজেশন",
+                text = "পাঠের আরাম ও ফন্ট সেটিংস",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
             )
             Text(
-                text = "আপনার চোখের আরাম অনুযায়ী আরবি ও বাংলা ফন্ট এবং থিম নির্ধারণ করুন",
+                text = "মনোযোগ ধরে রাখতে ও চোখের আরামের জন্য ফন্ট, লাইন স্পেসিং ও থিম কাস্টমাইজ করুন",
                 style = MaterialTheme.typography.bodySmall.copy(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -498,7 +489,7 @@ fun ReaderTypographyBottomSheet(
 
             // Theme selector chips
             Text(
-                text = "রিডিং থিম মোড",
+                text = "রিডিং থিম পরিবেশ",
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -516,7 +507,7 @@ fun ReaderTypographyBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Arabic Font Size Slider
             Row(
@@ -560,8 +551,57 @@ fun ReaderTypographyBottomSheet(
                 modifier = Modifier.testTag("bangla_font_slider")
             )
 
+            // Line Spacing Slider
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "লাইন স্পেসিং (স্বস্তিদায়ক পাঠের দূরত্ব)",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                val pct = ((preferences.lineHeightMultiplier * 100).toInt()).toBanglaDigits()
+                Text(
+                    text = "$pct%",
+                    style = MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.primary)
+                )
+            }
+            Slider(
+                value = preferences.lineHeightMultiplier,
+                onValueChange = onLineHeightChange,
+                valueRange = 1.4f..2.1f,
+                modifier = Modifier.testTag("line_height_slider")
+            )
+
+            // Eye-Care Warm Light Filter Slider
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "চোখের আরাম ফিল্টার (নীল আলো হ্রাস)",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                val warmPct = ((preferences.eyeCareWarmFilter / 0.28f) * 100).toInt().coerceIn(0, 100).toBanglaDigits()
+                Text(
+                    text = "$warmPct%",
+                    style = MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.primary)
+                )
+            }
+            Slider(
+                value = preferences.eyeCareWarmFilter,
+                onValueChange = onEyeCareFilterChange,
+                valueRange = 0f..0.28f,
+                modifier = Modifier.testTag("eye_care_warm_slider")
+            )
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+            SettingSwitchRow(
+                title = "পড়ার সময় স্ক্রিন চালু রাখুন",
+                checked = preferences.keepScreenOnWhileReading,
+                onCheckedChange = onToggleKeepScreenOn
+            )
             SettingSwitchRow(
                 title = "আরবি ইবারত প্রদর্শন",
                 checked = preferences.showArabic,
@@ -573,15 +613,22 @@ fun ReaderTypographyBottomSheet(
                 onCheckedChange = onToggleTashkeel
             )
             SettingSwitchRow(
-                title = "বাংলা উচ্চারণ প্রদর্শন",
-                checked = preferences.showTransliteration,
-                onCheckedChange = onToggleTransliteration
-            )
-            SettingSwitchRow(
                 title = "সংক্ষিপ্ত ব্যাখ্যা ও শিক্ষা প্রদর্শন",
                 checked = preferences.showExplanation,
                 onCheckedChange = onToggleExplanation
             )
+
+            if (onImportSqliteDatabase != null) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                androidx.compose.material3.OutlinedButton(
+                    onClick = { dbFilePicker.launch("*/*") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings_import_sqlite_button")
+                ) {
+                    Text("নতুন হাদিস ডেটাবেস (.sqlite / .db) যুক্ত করুন")
+                }
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
         }

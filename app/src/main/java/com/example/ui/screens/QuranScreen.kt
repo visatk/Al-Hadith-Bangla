@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,17 +23,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FindInPage
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -46,6 +51,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -54,6 +60,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -95,6 +102,8 @@ fun QuranScreen(
     highlightedAyahNumber: Int?,
     preferences: ReaderPreferences,
     isExpandedScreen: Boolean,
+    isFocusMode: Boolean,
+    onToggleFocusMode: () -> Unit,
     onSelectSurah: (SurahEntity) -> Unit,
     onBackToSurahs: () -> Boolean,
     onQuickJumpSurahAyah: (surahId: Int, ayahNumber: Int) -> Unit,
@@ -103,23 +112,27 @@ fun QuranScreen(
 ) {
     var showQuickJumpDialog by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = selectedSurah != null) {
+    BackHandler(enabled = selectedSurah != null || isFocusMode) {
         onBackToSurahs()
     }
 
     if (isExpandedScreen) {
         val activeSurah = selectedSurah ?: surahs.firstOrNull()
         Row(modifier = modifier.fillMaxSize()) {
-            SurahCatalogPane(
-                surahs = surahs,
-                selectedSurahId = activeSurah?.id,
-                onSelectSurah = onSelectSurah,
-                onOpenQuickJump = { showQuickJumpDialog = true },
-                modifier = Modifier
-                    .width(350.dp)
-                    .fillMaxHeight()
-            )
-            VerticalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            AnimatedVisibility(visible = !isFocusMode) {
+                Row(modifier = Modifier.fillMaxHeight()) {
+                    SurahCatalogPane(
+                        surahs = surahs,
+                        selectedSurahId = activeSurah?.id,
+                        onSelectSurah = onSelectSurah,
+                        onOpenQuickJump = { showQuickJumpDialog = true },
+                        modifier = Modifier
+                            .width(350.dp)
+                            .fillMaxHeight()
+                    )
+                    VerticalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                }
+            }
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -131,8 +144,10 @@ fun QuranScreen(
                         ayahs = ayahs,
                         highlightedAyahNumber = highlightedAyahNumber,
                         preferences = preferences,
-                        showBackButton = false,
-                        onBack = {},
+                        showBackButton = isFocusMode,
+                        isFocusMode = isFocusMode,
+                        onToggleFocusMode = onToggleFocusMode,
+                        onBack = { if (isFocusMode) onToggleFocusMode() else onBackToSurahs() },
                         onOpenQuickJump = { showQuickJumpDialog = true },
                         onOpenTypographySheet = onOpenTypographySheet
                     )
@@ -155,6 +170,8 @@ fun QuranScreen(
                 highlightedAyahNumber = highlightedAyahNumber,
                 preferences = preferences,
                 showBackButton = true,
+                isFocusMode = isFocusMode,
+                onToggleFocusMode = onToggleFocusMode,
                 onBack = { onBackToSurahs() },
                 onOpenQuickJump = { showQuickJumpDialog = true },
                 onOpenTypographySheet = onOpenTypographySheet,
@@ -366,6 +383,8 @@ private fun SurahAyahReaderPane(
     highlightedAyahNumber: Int?,
     preferences: ReaderPreferences,
     showBackButton: Boolean,
+    isFocusMode: Boolean,
+    onToggleFocusMode: () -> Unit,
     onBack: () -> Unit,
     onOpenQuickJump: () -> Unit,
     onOpenTypographySheet: () -> Unit,
@@ -373,6 +392,12 @@ private fun SurahAyahReaderPane(
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val surahProgress by remember(ayahs.size) {
+        derivedStateOf {
+            if (ayahs.isEmpty()) 0f
+            else ((listState.firstVisibleItemIndex).coerceAtLeast(1).toFloat() / ayahs.size.toFloat()).coerceIn(0.03f, 1f)
+        }
+    }
 
     LaunchedEffect(ayahs, highlightedAyahNumber) {
         if (ayahs.isNotEmpty() && highlightedAyahNumber != null) {
@@ -390,91 +415,115 @@ private fun SurahAyahReaderPane(
             tonalElevation = 3.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (showBackButton) {
-                        IconButton(
-                            onClick = onBack,
-                            modifier = Modifier.testTag("quran_reader_back_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "সূরা তালিকায় ফিরুন"
+            Column {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (showBackButton) {
+                            IconButton(
+                                onClick = onBack,
+                                modifier = Modifier.testTag("quran_reader_back_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "সূরা তালিকায় ফিরুন"
+                                )
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "সূরা নং ${surah.id.toBanglaDigits()} • ${surah.revelationBn} • ${surah.totalVerses.toBanglaDigits()} আয়াত",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                            Text(
+                                text = "সূরা ${surah.nameBn} (${surah.meaningBn})",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
+
                         Text(
-                            text = "সূরা নং ${surah.id.toBanglaDigits()} • ${surah.revelationBn} • ${surah.totalVerses.toBanglaDigits()} আয়াত",
-                            style = MaterialTheme.typography.labelLarge.copy(
+                            text = surah.nameAr,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontFamily = AmiriArabicFontFamily,
+                                fontSize = 22.sp,
                                 color = MaterialTheme.colorScheme.primary
                             )
                         )
-                        Text(
-                            text = "সূরা ${surah.nameBn} (${surah.meaningBn})",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
 
-                    Text(
-                        text = surah.nameAr,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontFamily = AmiriArabicFontFamily,
-                            fontSize = 22.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    )
+                        IconButton(
+                            onClick = onToggleFocusMode,
+                            modifier = Modifier.testTag("quran_focus_mode_button")
+                        ) {
+                            Icon(
+                                imageVector = if (isFocusMode) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                contentDescription = if (isFocusMode) "মনোযোগ মোড বন্ধ করুন" else "মনোযোগ মোড চালু করুন",
+                                tint = if (isFocusMode) GoldAccent else MaterialTheme.colorScheme.primary
+                            )
+                        }
 
-                    IconButton(
-                        onClick = onOpenQuickJump,
-                        modifier = Modifier.testTag("surah_reader_jump_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FindInPage,
-                            contentDescription = "আয়াত জাম্প",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                        IconButton(
+                            onClick = onOpenQuickJump,
+                            modifier = Modifier.testTag("surah_reader_jump_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FindInPage,
+                                contentDescription = "আয়াত জাম্প",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
 
-                    IconButton(
-                        onClick = onOpenTypographySheet,
-                        modifier = Modifier.testTag("quran_typography_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = "ফন্ট সেটিংস",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-
-                // Quick Jump-to-Ayah Horizontal Chips
-                if (ayahs.size > 1) {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(top = 4.dp)
-                    ) {
-                        items(ayahs.size) { index ->
-                            val ayah = ayahs[index]
-                            AssistChip(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        listState.animateScrollToItem(index + 1)
-                                    }
-                                },
-                                label = {
-                                    Text("আয়াত ${ayah.ayahNumber.toBanglaDigits()}")
-                                }
+                        IconButton(
+                            onClick = onOpenTypographySheet,
+                            modifier = Modifier.testTag("quran_typography_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = "ফন্ট সেটিংস",
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
+
+                    // Quick Jump-to-Ayah Horizontal Chips
+                    AnimatedVisibility(visible = !isFocusMode && ayahs.size > 1) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(top = 4.dp)
+                        ) {
+                            items(ayahs.size) { index ->
+                                val ayah = ayahs[index]
+                                AssistChip(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            listState.animateScrollToItem(index + 1)
+                                        }
+                                    },
+                                    label = {
+                                        Text("আয়াত ${ayah.ayahNumber.toBanglaDigits()}")
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (ayahs.size > 1) {
+                    LinearProgressIndicator(
+                        progress = { surahProgress },
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                    )
                 }
             }
         }
@@ -485,18 +534,22 @@ private fun SurahAyahReaderPane(
                 .fillMaxSize()
                 .testTag("ayah_reader_lazy_column"),
             contentPadding = PaddingValues(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Surah Ornamental Banner + Bismillah (except Surah At-Tawbah #9)
             item {
-                SurahBismillahBanner(surah = surah)
+                Box(modifier = Modifier.widthIn(max = 780.dp)) {
+                    SurahBismillahBanner(surah = surah)
+                }
             }
 
             items(ayahs, key = { it.id }) { ayah ->
                 QuranAyahCard(
                     ayah = ayah,
                     preferences = preferences,
-                    isHighlighted = highlightedAyahNumber == ayah.ayahNumber
+                    isHighlighted = highlightedAyahNumber == ayah.ayahNumber,
+                    modifier = Modifier.widthIn(max = 780.dp)
                 )
             }
         }
@@ -646,32 +699,36 @@ fun QuranAyahCard(
                         )
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    Text(
-                        text = ayah.arabicText.stripArabicTashkeel(preferences.showTashkeel),
-                        style = MaterialTheme.typography.displayMedium.copy(
-                            fontFamily = AmiriArabicFontFamily,
-                            fontSize = preferences.arabicFontSizeSp.sp,
-                            lineHeight = (preferences.arabicFontSizeSp * 1.75f).sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Right,
-                            textDirection = TextDirection.Rtl
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    SelectionContainer {
+                        Text(
+                            text = ayah.arabicText.stripArabicTashkeel(preferences.showTashkeel),
+                            style = MaterialTheme.typography.displayMedium.copy(
+                                fontFamily = AmiriArabicFontFamily,
+                                fontSize = preferences.arabicFontSizeSp.sp,
+                                lineHeight = (preferences.arabicFontSizeSp * (preferences.lineHeightMultiplier + 0.12f)).sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.Right,
+                                textDirection = TextDirection.Rtl
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text = ayah.banglaTranslation,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontFamily = HindSiliguriBanglaFontFamily,
-                    fontSize = preferences.banglaFontSizeSp.sp,
-                    lineHeight = (preferences.banglaFontSizeSp * 1.62f).sp,
-                    color = MaterialTheme.colorScheme.onSurface
+            SelectionContainer {
+                Text(
+                    text = ayah.banglaTranslation,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontFamily = HindSiliguriBanglaFontFamily,
+                        fontSize = preferences.banglaFontSizeSp.sp,
+                        lineHeight = (preferences.banglaFontSizeSp * preferences.lineHeightMultiplier).sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 )
-            )
+            }
         }
     }
 }

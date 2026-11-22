@@ -1,12 +1,12 @@
 package com.example
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,13 +23,11 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -41,12 +39,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,7 +63,6 @@ import com.example.ui.screens.BooksAndReaderScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.QuranScreen
 import com.example.ui.screens.SearchScreen
-import com.example.ui.screens.SqliteArchitectureScreen
 import com.example.ui.theme.AlHadithBanglaTheme
 import com.example.ui.viewmodel.AppDestination
 import com.example.ui.viewmodel.HadithViewModel
@@ -74,6 +74,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: HadithViewModel = viewModel()
             val readerPreferences by viewModel.readerPreferences.collectAsStateWithLifecycle()
+
+            LaunchedEffect(readerPreferences.keepScreenOnWhileReading) {
+                if (readerPreferences.keepScreenOnWhileReading) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
 
             AlHadithBanglaTheme(themeMode = readerPreferences.themeMode) {
                 AlHadithAppRoot(viewModel = viewModel)
@@ -92,6 +100,7 @@ private data class NavDestinationMeta(
 @Composable
 fun AlHadithAppRoot(viewModel: HadithViewModel) {
     val currentDestination by viewModel.currentDestination.collectAsStateWithLifecycle()
+    val isFocusMode by viewModel.isFocusMode.collectAsStateWithLifecycle()
     val books by viewModel.books.collectAsStateWithLifecycle()
     val allHadiths by viewModel.allHadiths.collectAsStateWithLifecycle()
     val totalIndexedHadiths by viewModel.totalIndexedHadiths.collectAsStateWithLifecycle()
@@ -123,15 +132,14 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
     val bookmarkCollections by viewModel.bookmarkCollections.collectAsStateWithLifecycle()
     val readingProgress by viewModel.readingProgress.collectAsStateWithLifecycle()
     val readerPreferences by viewModel.readerPreferences.collectAsStateWithLifecycle()
-    val sqliteReports by viewModel.sqliteReports.collectAsStateWithLifecycle()
-    val isSyncingSqlite by viewModel.isSyncingSqlite.collectAsStateWithLifecycle()
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
 
     var showTypographySheet by remember { mutableStateOf(false) }
     var activeBookmarkHadith by remember { mutableStateOf<HadithEntity?>(null) }
 
     val isInsideSubScreen = (currentDestination == AppDestination.BOOKS && (selectedBook != null || selectedChapter != null)) ||
-        (currentDestination == AppDestination.QURAN && selectedSurah != null)
+        (currentDestination == AppDestination.QURAN && selectedSurah != null) ||
+        isFocusMode
 
     BackHandler(enabled = currentDestination != AppDestination.HOME && !isInsideSubScreen) {
         viewModel.navigateToDestination(AppDestination.HOME)
@@ -143,12 +151,22 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
             NavDestinationMeta(AppDestination.BOOKS, Icons.Filled.MenuBook, Icons.Outlined.MenuBook, "nav_books"),
             NavDestinationMeta(AppDestination.QURAN, Icons.Filled.AutoStories, Icons.Outlined.AutoStories, "nav_quran"),
             NavDestinationMeta(AppDestination.SEARCH, Icons.Filled.Search, Icons.Outlined.Search, "nav_search"),
-            NavDestinationMeta(AppDestination.BOOKMARKS, Icons.Filled.Bookmark, Icons.Outlined.BookmarkBorder, "nav_bookmarks"),
-            NavDestinationMeta(AppDestination.SQLITE_STUDIO, Icons.Filled.Storage, Icons.Outlined.Storage, "nav_sqlite")
+            NavDestinationMeta(AppDestination.BOOKMARKS, Icons.Filled.Bookmark, Icons.Outlined.BookmarkBorder, "nav_bookmarks")
         )
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    val warmFilterAlpha = readerPreferences.eyeCareWarmFilter.coerceIn(0f, 0.30f)
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .drawWithContent {
+                drawContent()
+                if (warmFilterAlpha > 0.005f) {
+                    drawRect(color = Color(0xFFFFA000).copy(alpha = warmFilterAlpha))
+                }
+            }
+    ) {
         val isCompactScreen = maxWidth < 600.dp
         val isExpandedScreen = maxWidth >= 600.dp
         val isLargeExpandedScreen = maxWidth >= 1040.dp
@@ -156,7 +174,7 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
         Scaffold(
             contentWindowInsets = WindowInsets.safeDrawing,
             bottomBar = {
-                if (isCompactScreen) {
+                AnimatedVisibility(visible = isCompactScreen && !isFocusMode) {
                     NavigationBar {
                         navItems.forEach { item ->
                             val selected = currentDestination == item.destination
@@ -189,7 +207,7 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                if (isExpandedScreen && !isLargeExpandedScreen) {
+                AnimatedVisibility(visible = isExpandedScreen && !isLargeExpandedScreen && !isFocusMode) {
                     NavigationRail(
                         modifier = Modifier.fillMaxHeight()
                     ) {
@@ -209,7 +227,9 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                             )
                         }
                     }
-                } else if (isLargeExpandedScreen) {
+                }
+
+                AnimatedVisibility(visible = isLargeExpandedScreen && !isFocusMode) {
                     androidx.compose.material3.PermanentDrawerSheet(
                         modifier = Modifier
                             .fillMaxHeight()
@@ -288,7 +308,6 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                                     totalSurahs = surahs.size,
                                     totalAyahs = totalIndexedAyahs,
                                     readingProgress = readingProgress,
-                                    sqliteReports = sqliteReports,
                                     onBookClick = { book -> viewModel.openBook(book) },
                                     onHadithClick = { hadith -> viewModel.openHadithFromAnywhere(hadith) },
                                     onOpenQuranClick = {
@@ -305,9 +324,6 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                                     },
                                     onTopicClick = { topic ->
                                         viewModel.openTopicSearch(topic)
-                                    },
-                                    onSqliteStudioClick = {
-                                        viewModel.navigateToDestination(AppDestination.SQLITE_STUDIO)
                                     },
                                     onTypographySettingsClick = {
                                         showTypographySheet = true
@@ -327,6 +343,8 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                                     preferences = readerPreferences,
                                     highlightedHadithId = highlightedHadithId,
                                     isExpandedScreen = isExpandedScreen,
+                                    isFocusMode = isFocusMode,
+                                    onToggleFocusMode = { viewModel.toggleFocusMode() },
                                     onSelectBook = { book -> viewModel.openBook(book) },
                                     onSelectChapter = { book, chapter ->
                                         viewModel.openChapter(book, chapter)
@@ -358,6 +376,8 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                                     highlightedAyahNumber = highlightedAyahNumber,
                                     preferences = readerPreferences,
                                     isExpandedScreen = isExpandedScreen,
+                                    isFocusMode = isFocusMode,
+                                    onToggleFocusMode = { viewModel.toggleFocusMode() },
                                     onSelectSurah = { surah -> viewModel.openSurah(surah) },
                                     onBackToSurahs = { viewModel.navigateBackInQuran() },
                                     onQuickJumpSurahAyah = { sId, aNum ->
@@ -412,20 +432,6 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
                                     }
                                 )
                             }
-
-                            AppDestination.SQLITE_STUDIO -> {
-                                SqliteArchitectureScreen(
-                                    sqliteReports = sqliteReports,
-                                    isSyncing = isSyncingSqlite,
-                                    totalBooksCount = books.size,
-                                    totalHadithsCount = if (totalIndexedHadiths > 0) totalIndexedHadiths else books.sumOf { it.hadithCount },
-                                    totalAyahsCount = if (totalIndexedAyahs > 0) totalIndexedAyahs else 6236,
-                                    onResyncClick = { viewModel.refreshSqliteDatabases(forceRefresh = true) },
-                                    onImportSqliteUri = { uri ->
-                                        viewModel.importExternalSqliteDatabase(uri)
-                                    }
-                                )
-                            }
                         }
                     }
                 }
@@ -438,11 +444,16 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
             preferences = readerPreferences,
             onArabicSizeChange = viewModel::setArabicFontSize,
             onBanglaSizeChange = viewModel::setBanglaFontSize,
+            onLineHeightChange = viewModel::setLineHeightMultiplier,
+            onEyeCareFilterChange = viewModel::setEyeCareWarmFilter,
+            onToggleKeepScreenOn = viewModel::setKeepScreenOn,
             onToggleArabic = viewModel::setShowArabic,
-            onToggleTransliteration = viewModel::setShowTransliteration,
             onToggleExplanation = viewModel::setShowExplanation,
             onToggleTashkeel = viewModel::setShowTashkeel,
             onThemeModeChange = viewModel::setThemeMode,
+            onImportSqliteDatabase = { uri ->
+                viewModel.importExternalSqliteDatabase(uri)
+            },
             onDismiss = { showTypographySheet = false }
         )
     }

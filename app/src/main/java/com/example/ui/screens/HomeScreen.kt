@@ -78,14 +78,12 @@ fun HomeScreen(
     totalSurahs: Int,
     totalAyahs: Int,
     readingProgress: ReadingProgressEntity?,
-    sqliteReports: List<SqliteDatabaseFileReport>,
     onBookClick: (BookEntity) -> Unit,
     onHadithClick: (HadithEntity) -> Unit,
     onOpenQuranClick: () -> Unit,
     onContinueReadingClick: (ReadingProgressEntity) -> Unit,
     onSearchBarClick: () -> Unit,
     onTopicClick: (String) -> Unit,
-    onSqliteStudioClick: () -> Unit,
     onTypographySettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -108,16 +106,26 @@ fun HomeScreen(
         // 1. Atmospheric Islamic Arch Hero Banner + Search Trigger
         item {
             HeroSanctuaryHeader(
-                sqliteCount = sqliteReports.size,
                 totalBooks = books.size,
+                totalSurahs = if (totalSurahs > 0) totalSurahs else 114,
                 totalIndexedHadiths = if (totalIndexedHadiths > 0) totalIndexedHadiths else books.sumOf { it.hadithCount },
                 onSearchBarClick = onSearchBarClick,
-                onSqliteStudioClick = onSqliteStudioClick,
                 onTypographySettingsClick = onTypographySettingsClick
             )
         }
 
-        // 1b. Al-Quran Sanctuary Quick Access Banner
+        // 2. Continue Reading Card (সর্বশেষ পঠিত) right at top for instant focus
+        if (readingProgress != null) {
+            item {
+                ContinueReadingCard(
+                    progress = readingProgress,
+                    onClick = { onContinueReadingClick(readingProgress) },
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
+        }
+
+        // 3. Al-Quran Sanctuary Quick Access Banner
         item {
             AlQuranQuickAccessCard(
                 totalSurahs = if (totalSurahs > 0) totalSurahs else 114,
@@ -127,18 +135,7 @@ fun HomeScreen(
             )
         }
 
-        // 2. Continue Reading Card (সর্বশেষ পঠিত) or Quick Welcome Guide
-        item {
-            if (readingProgress != null) {
-                ContinueReadingCard(
-                    progress = readingProgress,
-                    onClick = { onContinueReadingClick(readingProgress) },
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-        }
-
-        // 3. Daily Featured Hadith Showcase (আজকের নির্বাচিত হাদিস)
+        // 4. Daily Featured Hadith Showcase (আজকের নির্বাচিত হাদিস)
         if (featuredHadith != null) {
             item {
                 FeaturedHadithShowcaseCard(
@@ -149,7 +146,7 @@ fun HomeScreen(
             }
         }
 
-        // 4. Topic Explorer Chips (বিষয়ভিত্তিক হাদিস অন্বেষণ)
+        // 5. Topic Explorer Chips (বিষয়ভিত্তিক হাদিস অন্বেষণ)
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Row(
@@ -158,7 +155,7 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "বিষয়ভিত্তিক হাদিস অন্বেষণ",
+                        text = "বিষয়ভিত্তিক হাদিস",
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold
                         )
@@ -202,7 +199,7 @@ fun HomeScreen(
             }
         }
 
-        // 5. Primary Hadith Books Collection Header
+        // 6. Primary Hadith Books Collection Header
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 IslamicGeometricDivider(
@@ -224,7 +221,7 @@ fun HomeScreen(
                             )
                         )
                         Text(
-                            text = "সিহাহ সিত্তাহ ও নির্বাচিত হাদিস সংকলন (.sqlite চালিত)",
+                            text = "অধ্যায় ও পরিচ্ছেদ অনুযায়ী হাদিস অধ্যয়ন করুন",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -232,35 +229,21 @@ fun HomeScreen(
                     }
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .clickable { onSqliteStudioClick() }
+                        color = MaterialTheme.colorScheme.primaryContainer
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Storage,
-                                contentDescription = "SQLite উৎস",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "${books.size.toBanglaDigits()} টি গ্রন্থ",
-                                style = MaterialTheme.typography.labelLarge.copy(
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            )
-                        }
+                        Text(
+                            text = "${books.size.toBanglaDigits()} টি গ্রন্থ",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            ),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
                     }
                 }
             }
         }
 
-        // 6. Books Grid (2 columns or responsive cards)
+        // 7. Books Grid (2 columns or responsive cards)
         val chunkedBooks = books.chunked(2)
         items(chunkedBooks.size) { rowIndex ->
             val pair = chunkedBooks[rowIndex]
@@ -287,11 +270,10 @@ fun HomeScreen(
 
 @Composable
 private fun HeroSanctuaryHeader(
-    sqliteCount: Int,
     totalBooks: Int,
+    totalSurahs: Int,
     totalIndexedHadiths: Int,
     onSearchBarClick: () -> Unit,
-    onSqliteStudioClick: () -> Unit,
     onTypographySettingsClick: () -> Unit
 ) {
     Box(
@@ -329,7 +311,7 @@ private fun HeroSanctuaryHeader(
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
-            // Top bar with Arabic Basmala & Typography button
+            // Top bar with Library summary & Reading Comfort / Typography button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -337,11 +319,7 @@ private fun HeroSanctuaryHeader(
             ) {
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = Color.White.copy(alpha = 0.12f),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .clickable { onSqliteStudioClick() }
-                        .testTag("hero_sqlite_status_badge")
+                    color = Color.White.copy(alpha = 0.12f)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -355,7 +333,7 @@ private fun HeroSanctuaryHeader(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "${sqliteCount.toBanglaDigits()}টি .sqlite সক্রিয় • ${totalBooks.toBanglaDigits()}টি গ্রন্থ",
+                            text = "${totalBooks.toBanglaDigits()}টি হাদিস গ্রন্থ • ${totalSurahs.toBanglaDigits()}টি সূরা",
                             style = MaterialTheme.typography.labelLarge.copy(
                                 color = Color.White,
                                 fontSize = 12.sp
@@ -373,7 +351,7 @@ private fun HeroSanctuaryHeader(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Tune,
-                        contentDescription = "ফন্ট ও থিম সেটিংস",
+                        contentDescription = "পাঠের আরাম ও ফন্ট সেটিংস",
                         tint = GoldLight
                     )
                 }
@@ -391,14 +369,14 @@ private fun HeroSanctuaryHeader(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "আল হাদিস বাংলা",
+                text = "আল হাদিস ও আল-কুরআন",
                 style = MaterialTheme.typography.displayLarge.copy(
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
             )
             Text(
-                text = "রাসূলুল্লাহ (ﷺ)-এর বিশুদ্ধ সুন্নাহ, তাহকীক ও সংক্ষিপ্ত ব্যাখ্যা সংকলন",
+                text = "বিশুদ্ধ হাদিস সংকলন, তাহকীক ও আল-কুরআনের বাংলা অনুবাদ",
                 style = MaterialTheme.typography.bodyMedium.copy(
                     color = Color.White.copy(alpha = 0.85f)
                 )
@@ -430,7 +408,7 @@ private fun HeroSanctuaryHeader(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "হাদিস নম্বর, শব্দ, রাবী বা বিষয় লিখে খুঁজুন…",
+                        text = "হাদিস, কুরআনের আয়াত, রাবী বা বিষয় খুঁজুন…",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         ),

@@ -50,8 +50,18 @@ class SqliteAssetDataSource(private val context: Context) {
         private const val WORK_CACHE_FOLDER = "sqlite_inspection_cache"
 
         private val KNOWN_BOOK_CATALOG = mapOf(
-            "bn_hadis-somvar.sqlite" to ScholarBookMetadata(
+            "hadith.db" to ScholarBookMetadata(
                 bookId = 1,
+                titleBn = "সিহাহ সিত্তাহ ও মূল হাদিস সংকলন",
+                titleAr = "الكتب الستة ومصادر الحديث",
+                titleEn = "Al-Hadith Master Collection",
+                authorBn = "মুহাদ্দিস ইমামগণ (রহ.)",
+                bookCode = "হাদিস",
+                accentHex = "#0B5D48",
+                descriptionBn = "বিশুদ্ধ হাদিস সংকলন, অধ্যায়, পরিচ্ছেদ ও তাহকীককৃত হাদিস ভান্ডার।"
+            ),
+            "bn_hadis-somvar.sqlite" to ScholarBookMetadata(
+                bookId = 101,
                 titleBn = "হাদিস সম্ভার",
                 titleAr = "مجموعة الحديث",
                 titleEn = "Hadith Somvar",
@@ -61,7 +71,7 @@ class SqliteAssetDataSource(private val context: Context) {
                 descriptionBn = "ঈমান, আকীদাহ, ইবাদত, মুআমালাত ও আখলাক বিষয়ক সহীহ হাদিসের বিশাল বিষয়ভিত্তিক সংকলন।"
             ),
             "bn_luluwal-marjan.sqlite" to ScholarBookMetadata(
-                bookId = 2,
+                bookId = 102,
                 titleBn = "আল-লুলু ওয়াল মারজান",
                 titleAr = "اللؤلؤ والمرجان",
                 titleEn = "Al-Lulu Wal-Marjan",
@@ -71,7 +81,7 @@ class SqliteAssetDataSource(private val context: Context) {
                 descriptionBn = "সহীহ বুখারী ও সহীহ মুসলিমের ঐকমত্যপূর্ণ (মুত্তাফাকুন আলাইহি) সর্বোচ্চ বিশুদ্ধ হাদিস সংকলন।"
             ),
             "bn_bulugul-maram.sqlite" to ScholarBookMetadata(
-                bookId = 3,
+                bookId = 103,
                 titleBn = "বুলুগুল মারাম",
                 titleAr = "بلوغ المرام",
                 titleEn = "Bulugh al-Maram",
@@ -81,7 +91,7 @@ class SqliteAssetDataSource(private val context: Context) {
                 descriptionBn = "ইসলামী ফিকহ ও আহকাম (পবিত্রতা, সালাত, যাকাত, সিয়াম, হজ্জ ও লেনদেন) বিষয়ক দলীলভিত্তিক হাদিস গ্রন্থ।"
             ),
             "bn_adabul-mufrad.sqlite" to ScholarBookMetadata(
-                bookId = 4,
+                bookId = 104,
                 titleBn = "আল-আদাবুল মুফরাদ",
                 titleAr = "الأدب المفرد",
                 titleEn = "Al-Adab Al-Mufrad",
@@ -90,8 +100,78 @@ class SqliteAssetDataSource(private val context: Context) {
                 accentHex = "#117864",
                 descriptionBn = "পিতা-মাতার খেদমত, আত্মীয়তার সম্পর্ক, শিষ্টাচার ও উত্তম চরিত্র গঠনে ইমাম বুখারীর অনন্য হাদিস সংকলন।"
             ),
+            "bn_riyadus-salihin.sqlite" to ScholarBookMetadata(
+                bookId = 105,
+                titleBn = "রিয়াদুস সালেহীন",
+                titleAr = "رياض الصالحين",
+                titleEn = "Riyad as-Salihin",
+                authorBn = "ইমাম মুহিউদ্দীন ইয়াহইয়া আন-নববী (রহ.)",
+                bookCode = "রিয়াদুস",
+                accentHex = "#0E6251",
+                descriptionBn = "আখলাক, তাজকিয়া, ইবাদত ও মুমিনের আত্মশুদ্ধির জন্য বিশ্বের সর্বাধিক পঠিত হাদিস গ্রন্থ।"
+            ),
+            "bn_mishkatul-masabih.sqlite" to ScholarBookMetadata(
+                bookId = 106,
+                titleBn = "মিশকাতুল মাসাবীহ",
+                titleAr = "مشكاة المصابيح",
+                titleEn = "Mishkat al-Masabih",
+                authorBn = "ইমাম ওয়ালীউদ্দীন আল-খতীব আত-তাবরীযী (রহ.)",
+                bookCode = "মিশকাত",
+                accentHex = "#1F618D",
+                descriptionBn = "আকীদাহ, ফিকহ, ফাযায়েল ও ফিতান বিষয়ক হাদিসের পূর্ণাঙ্গ ও সুবিন্যস্ত সংকলন।"
+            ),
+            "bn_muwatta-malik.sqlite" to ScholarBookMetadata(
+                bookId = 107,
+                titleBn = "মুয়াত্তা ইমাম মালিক",
+                titleAr = "موطأ الإمام مالك",
+                titleEn = "Muwatta Imam Malik",
+                authorBn = "ইমাম মালিক ইবনু আনাস (রহ.)",
+                bookCode = "মুয়াত্তা",
+                accentHex = "#7D6608",
+                descriptionBn = "হিজরী দ্বিতীয় শতাব্দীতে মদীনার সুন্নাহ ও ফিকহ ভিত্তিক প্রাচীনতম প্রামাণিক হাদিস সংকলন।"
+            ),
+            "bn_shamayele-tirmidhi.sqlite" to ScholarBookMetadata(
+                bookId = 108,
+                titleBn = "শামায়েলে তিরমিযী",
+                titleAr = "الشمائل المحمدية",
+                titleEn = "Ash-Shama'il Al-Muhammadiyyah",
+                authorBn = "ইমাম আবূ ঈসা আত-তিরমিযী (রহ.)",
+                bookCode = "শামায়েল",
+                accentHex = "#0B5345",
+                descriptionBn = "রাসূলুল্লাহ (ﷺ)-এর দৈহিক অবয়ব, পোশাক, আহার, ইবাদত ও মহান চরিত্র মাধুর্যের হৃদয়গ্রাহী হাদিস সংকলন।"
+            ),
+            "bn_sahih-hadise-qudsi.sqlite" to ScholarBookMetadata(
+                bookId = 109,
+                titleBn = "সহীহ হাদিসে কুদসী",
+                titleAr = "الأحاديث القدسية الصحيحة",
+                titleEn = "Sahih Hadith Qudsi",
+                authorBn = "মুহাদ্দিস সংকলন",
+                bookCode = "কুদসী",
+                accentHex = "#6C3483",
+                descriptionBn = "মহান আল্লাহ তাআলার পক্ষ হতে রাসূলুল্লাহ (ﷺ)-এর ভাষায় বর্ণিত বিশুদ্ধ হাদিসে কুদসী সংকলন।"
+            ),
+            "bn_silsila-sahiha.sqlite" to ScholarBookMetadata(
+                bookId = 110,
+                titleBn = "সিলসিলা সহীহাহ",
+                titleAr = "سلسلة الأحاديث الصحيحة",
+                titleEn = "Silsilat al-Ahadith as-Sahihah",
+                authorBn = "ইমাম নাসিরুদ্দীন আল-আলবানী (রহ.)",
+                bookCode = "সহীহাহ",
+                accentHex = "#145A32",
+                descriptionBn = "বিভিন্ন হাদিস গ্রন্থ হতে বাছাইকৃত ও সনদ যাচাইকৃত বিশুদ্ধ হাদিস সিরিজ।"
+            ),
+            "bn_targib-wattahrib.sqlite" to ScholarBookMetadata(
+                bookId = 111,
+                titleBn = "আত-তারগীব ওয়াত-তারহীব",
+                titleAr = "الترغيب والترهيب",
+                titleEn = "At-Targhib wat-Tarhib",
+                authorBn = "হাফেয যাকীউদ্দীন আল-মুনযিরী (রহ.)",
+                bookCode = "তারগীব",
+                accentHex = "#1B4F72",
+                descriptionBn = "নেক আমলের প্রতি উৎসাহ এবং গুনাহ ও নাফরমানী হতে ভীতিপ্রদর্শন বিষয়ক হাদিস সংকলন।"
+            ),
             "bn_fazayele-amal.sqlite" to ScholarBookMetadata(
-                bookId = 5,
+                bookId = 112,
                 titleBn = "সহীহ ফাযায়েলে আমল",
                 titleAr = "فضائل الأعمال",
                 titleEn = "Sahih Fazayele Amal",
@@ -100,18 +180,18 @@ class SqliteAssetDataSource(private val context: Context) {
                 accentHex = "#2E4053",
                 descriptionBn = "কুরআন ও বিশুদ্ধ সুন্নাহর আলোকে তাওহীদ, ইবাদত ও নেক আমলের ফযীলত সম্পর্কিত প্রামাণিক হাদিস সংকলন।"
             ),
-            "bn_dhaif-hadis-sirij.sqlite" to ScholarBookMetadata(
-                bookId = 6,
-                titleBn = "জাল ও যঈফ হাদিস সিরিজ",
-                titleAr = "سلسلة الأحاديث الضعيفة",
-                titleEn = "Dhaif & Mawdu Hadith Series",
-                authorBn = "ইমাম নাসিরুদ্দীন আল-আলবানী (রহ.)",
-                bookCode = "তাহকীক",
-                accentHex = "#922B21",
-                descriptionBn = "সমাজে প্রচলিত দুর্বল, বানোয়াট ও ভিত্তিহীন বর্ণনাসমূহ চিহ্নিতকরণ ও মুহাদ্দিসগণের তাহকীক সংকলন।"
+            "bn_upodesh.sqlite" to ScholarBookMetadata(
+                bookId = 113,
+                titleBn = "নবীজীর (ﷺ) উপদেশমালা",
+                titleAr = "وصايا الرسول ﷺ",
+                titleEn = "Prophetic Counsels",
+                authorBn = "নির্বাচিত হাদিস সংকলন",
+                bookCode = "উপদেশ",
+                accentHex = "#784212",
+                descriptionBn = "সাহাবীগণের প্রতি রাসূলুল্লাহ (ﷺ)-এর অমূল্য নসীহত ও জীবনঘনিষ্ঠ উপদেশমূলক হাদিস সংকলন।"
             ),
             "bn_100-hadith.sqlite" to ScholarBookMetadata(
-                bookId = 7,
+                bookId = 114,
                 titleBn = "সুন্নাত ও আদব ১০০ হাদিস",
                 titleAr = "مائة حديث",
                 titleEn = "100 Sunnah Hadiths",
@@ -120,8 +200,18 @@ class SqliteAssetDataSource(private val context: Context) {
                 accentHex = "#1F618D",
                 descriptionBn = "দৈনন্দিন জীবনের সুন্নত, ঘুম, আহার, পোশাক ও মুমিন জীবনের অপরিহার্য ১০০টি হাদিস সংকলন।"
             ),
+            "bn_40-hadith.sqlite" to ScholarBookMetadata(
+                bookId = 115,
+                titleBn = "ইমাম নববীর ৪০ হাদিস",
+                titleAr = "الأربعون النووية",
+                titleEn = "Al-Arba'in An-Nawawiyyah",
+                authorBn = "ইমাম মুহিউদ্দীন ইয়াহইয়া আন-নববী (রহ.)",
+                bookCode = "নববী",
+                accentHex = "#B7950B",
+                descriptionBn = "ইসলামের মূল ভিত্তি, ঈমান, ইখলাস, হালাল-হারাম ও তাকওয়া বিষয়ক ৪২টি কালজয়ী জাওয়ামিউল কালিম হাদিস।"
+            ),
             "bn_jujul-rafayel-yadain.sqlite" to ScholarBookMetadata(
-                bookId = 8,
+                bookId = 116,
                 titleBn = "জুযউল রাফউল ইয়াদাইন",
                 titleAr = "جزء رفع اليدين",
                 titleEn = "Juz Raful Yadain",
@@ -130,15 +220,35 @@ class SqliteAssetDataSource(private val context: Context) {
                 accentHex = "#6C3483",
                 descriptionBn = "সালাতে তাকবীরে তাহরীমা ও রুকুতে গমনাগমনের সময় রাফউল ইয়াদাইন করার সুন্নাহ ও সাহাবীগণের আমল।"
             ),
-            "bn_40-hadith.sqlite" to ScholarBookMetadata(
-                bookId = 9,
-                titleBn = "ইমাম নববীর ৪০ হাদিস",
-                titleAr = "الأربعون النووية",
-                titleEn = "Al-Arba'in An-Nawawiyyah",
-                authorBn = "ইমাম মুহিউদ্দীন ইয়াহইয়া আন-নববী (রহ.)",
-                bookCode = "নববী",
-                accentHex = "#B7950B",
-                descriptionBn = "ইসলামের মূল ভিত্তি, ঈমান, ইখলাস, হালাল-হারাম ও তাকওয়া বিষয়ক ৪২টি কালজয়ী জাওয়ামিউল কালিম হাদিস।"
+            "bn_dhaif-hadis-sirij.sqlite" to ScholarBookMetadata(
+                bookId = 117,
+                titleBn = "জাল ও যঈফ হাদিস সিরিজ",
+                titleAr = "سلسلة الأحاديث الضعيفة",
+                titleEn = "Dhaif & Mawdu Hadith Series",
+                authorBn = "ইমাম নাসিরুদ্দীন আল-আলবানী (রহ.)",
+                bookCode = "তাহকীক",
+                accentHex = "#922B21",
+                descriptionBn = "সমাজে প্রচলিত দুর্বল, বানোয়াট ও ভিত্তিহীন বর্ণনাসমূহ চিহ্নিতকরণ ও মুহাদ্দিসগণের তাহকীক সংকলন।"
+            ),
+            "bn_miskate-dhaif-hadis.sqlite" to ScholarBookMetadata(
+                bookId = 118,
+                titleBn = "মিশকাতের যঈফ হাদিসসমূহ",
+                titleAr = "ضعيف مشكاة المصابيح",
+                titleEn = "Dhaif Mishkat al-Masabih",
+                authorBn = "ইমাম নাসিরুদ্দীন আল-আলবানী (রহ.)",
+                bookCode = "তাহকীক",
+                accentHex = "#943126",
+                descriptionBn = "মিশকাতুল মাসাবীহ গ্রন্থে বর্ণিত যঈফ ও দুর্বল সনদের হাদিসসমূহের তাহকীক সংকলন।"
+            ),
+            "bn_ramadaner-durbol-hadis.sqlite" to ScholarBookMetadata(
+                bookId = 119,
+                titleBn = "রমাদানের দুর্বল ও জাল হাদিস",
+                titleAr = "أحاديث رمضان الضعيفة",
+                titleEn = "Weak Hadiths of Ramadan",
+                authorBn = "গবেষণামূলক তাহকীক সংকলন",
+                bookCode = "রমাদান",
+                accentHex = "#7B241C",
+                descriptionBn = "রমাদান ও সিয়াম সম্পর্কে সমাজে প্রচলিত ভিত্তিহীন ও দুর্বল বর্ণনাসমূহের প্রামাণিক তাহকীক।"
             )
         )
     }
@@ -159,7 +269,7 @@ class SqliteAssetDataSource(private val context: Context) {
         // 1. Discover .sqlite / .db files in assets/databases and assets/databases/bangla-hadiths
         val discoveredAssets = discoverAssetSqliteFiles()
 
-        var dynamicBookSeq = 20
+        var dynamicBookSeq = 200
         for ((assetFolder, fileName) in discoveredAssets) {
             val stagedFile = File(cacheWorkDir, "asset_${fileName.replace('/', '_')}")
             val assetRelPath = "$assetFolder/$fileName"
