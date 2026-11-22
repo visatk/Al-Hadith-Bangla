@@ -70,6 +70,7 @@ fun SqliteArchitectureScreen(
     isSyncing: Boolean,
     totalBooksCount: Int,
     totalHadithsCount: Int,
+    totalAyahsCount: Int = 6236,
     onResyncClick: () -> Unit,
     onImportSqliteUri: (Uri) -> Unit,
     modifier: Modifier = Modifier
@@ -222,8 +223,8 @@ CREATE TABLE hadiths (
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "app/src/main/assets/databases/",
-                                style = MaterialTheme.typography.titleMedium.copy(
+                                text = "app/src/main/assets/databases/bangla-hadiths/\napp/src/main/assets/databases/quran_bn.json",
+                                style = MaterialTheme.typography.titleSmall.copy(
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
@@ -231,7 +232,7 @@ CREATE TABLE hadiths (
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "আপনি প্রজেক্টের এই ফোল্ডারে যেকোনো .sqlite বা .db হাদিস ডেটাবেস ফাইল আপলোড করলেই অ্যাপটি স্বয়ংক্রিয়ভাবে তা স্ক্যান ও ইনডেক্স করে নেবে।",
+                                text = "এই ফোল্ডারের সকল .sqlite হাদিস গ্রন্থ (chapter, section, hadith স্কিমা) এবং quran_bn.json (১১৪ সূরা, ৬,২৩৬ আয়াত) স্বয়ংক্রিয়ভাবে স্ক্যান ও Room-এ ইনডেক্স করা হয়েছে।",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -295,18 +296,18 @@ CREATE TABLE hadiths (
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 MetricStatCard(
-                    title = "সক্রিয় .sqlite ফাইল",
-                    value = sqliteReports.size.toBanglaDigits(),
-                    modifier = Modifier.weight(1f)
-                )
-                MetricStatCard(
-                    title = "মোট হাদিস গ্রন্থ",
+                    title = "হাদিস গ্রন্থ",
                     value = totalBooksCount.toBanglaDigits(),
                     modifier = Modifier.weight(1f)
                 )
                 MetricStatCard(
                     title = "ইনডেক্সড হাদিস",
                     value = totalHadithsCount.toBanglaDigits(),
+                    modifier = Modifier.weight(1f)
+                )
+                MetricStatCard(
+                    title = "কুরআন আয়াত",
+                    value = totalAyahsCount.toBanglaDigits(),
                     modifier = Modifier.weight(1f)
                 )
             }

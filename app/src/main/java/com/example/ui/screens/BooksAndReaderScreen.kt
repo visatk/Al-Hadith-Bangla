@@ -22,13 +22,17 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.FindInPage
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -37,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,6 +69,7 @@ import com.example.ui.components.RubElHizbMedallion
 import com.example.ui.components.ScholarHadithCard
 import com.example.ui.components.parseHexColor
 import com.example.ui.components.toBanglaDigits
+import com.example.ui.components.toEnglishDigits
 import com.example.ui.theme.AmiriArabicFontFamily
 import com.example.ui.theme.GoldAccent
 import kotlinx.coroutines.launch
@@ -81,6 +88,7 @@ fun BooksAndReaderScreen(
     isExpandedScreen: Boolean,
     onSelectBook: (BookEntity) -> Unit,
     onSelectChapter: (BookEntity, ChapterEntity) -> Unit,
+    onQuickJumpHadithNumber: (BookEntity, Int) -> Unit,
     onBackStep: () -> Boolean,
     onBookmarkClick: (HadithEntity) -> Unit,
     onTopicClick: (String) -> Unit,
@@ -88,19 +96,20 @@ fun BooksAndReaderScreen(
     onOpenTypographySheet: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Handle system back navigation inside Books -> Chapters -> Hadiths drilldown
+    var showJumpDialog by remember { mutableStateOf(false) }
+
     BackHandler(enabled = selectedBook != null || selectedChapter != null) {
         onBackStep()
     }
 
     if (isExpandedScreen && selectedBook != null) {
-        // Canonical List-Detail Layout for Tablets / Foldables / Large Screens
         Row(modifier = modifier.fillMaxSize()) {
             ChapterListPane(
                 book = selectedBook,
                 chapters = chapters,
                 selectedChapterId = selectedChapter?.id,
                 onSelectChapter = { ch -> onSelectChapter(selectedBook, ch) },
+                onOpenQuickJump = { showJumpDialog = true },
                 onBackToBooks = { onBackStep() },
                 modifier = Modifier
                     .width(340.dp)
@@ -124,6 +133,7 @@ fun BooksAndReaderScreen(
                         highlightedHadithId = highlightedHadithId,
                         showBackButton = false,
                         onBack = {},
+                        onOpenQuickJump = { showJumpDialog = true },
                         onBookmarkClick = onBookmarkClick,
                         onTopicClick = onTopicClick,
                         onHadithViewed = onHadithViewed,
@@ -135,7 +145,6 @@ fun BooksAndReaderScreen(
             }
         }
     } else {
-        // Compact / Standard Single-Pane Hierarchical Flow
         when {
             selectedBook == null -> {
                 AllBooksCatalogPane(
@@ -150,6 +159,7 @@ fun BooksAndReaderScreen(
                     chapters = chapters,
                     selectedChapterId = null,
                     onSelectChapter = { ch -> onSelectChapter(selectedBook, ch) },
+                    onOpenQuickJump = { showJumpDialog = true },
                     onBackToBooks = { onBackStep() },
                     modifier = modifier
                 )
@@ -165,6 +175,7 @@ fun BooksAndReaderScreen(
                     highlightedHadithId = highlightedHadithId,
                     showBackButton = true,
                     onBack = { onBackStep() },
+                    onOpenQuickJump = { showJumpDialog = true },
                     onBookmarkClick = onBookmarkClick,
                     onTopicClick = onTopicClick,
                     onHadithViewed = onHadithViewed,
@@ -173,6 +184,17 @@ fun BooksAndReaderScreen(
                 )
             }
         }
+    }
+
+    if (showJumpDialog && selectedBook != null) {
+        HadithQuickJumpDialog(
+            book = selectedBook,
+            onJump = { num ->
+                onQuickJumpHadithNumber(selectedBook, num)
+                showJumpDialog = false
+            },
+            onDismiss = { showJumpDialog = false }
+        )
     }
 }
 
@@ -347,22 +369,23 @@ private fun ChapterListPane(
     chapters: List<ChapterEntity>,
     selectedChapterId: Int?,
     onSelectChapter: (ChapterEntity) -> Unit,
+    onOpenQuickJump: () -> Unit,
     onBackToBooks: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var chapterQuery by remember { mutableStateOf("") }
+    var chapterQuery by androidx.compose.runtime.saveable.rememberSaveable(book.id) { mutableStateOf("") }
     val accentColor = remember(book.accentHex) { parseHexColor(book.accentHex) }
     val filteredChapters = remember(chapters, chapterQuery) {
-        if (chapterQuery.isBlank()) chapters
+        val norm = chapterQuery.trim().toEnglishDigits()
+        if (norm.isBlank()) chapters
         else chapters.filter {
-            it.titleBn.contains(chapterQuery, ignoreCase = true) ||
-                it.titleAr.contains(chapterQuery, ignoreCase = true) ||
-                it.chapterNumber.toString() == chapterQuery.trim()
+            it.titleBn.contains(norm, ignoreCase = true) ||
+                it.titleAr.contains(norm, ignoreCase = true) ||
+                it.chapterNumber.toString() == norm
         }
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Book Header Bar
         Surface(
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 2.dp,
@@ -386,7 +409,7 @@ private fun ChapterListPane(
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
-                            text = "${book.authorBn} • ${chapters.size.toBanglaDigits()} টি সূচিপত্র লোডেড",
+                            text = "${book.authorBn} • ${chapters.size.toBanglaDigits()} টি অধ্যায় • ${book.hadithCount.toBanglaDigits()} হাদিস",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             ),
@@ -394,13 +417,18 @@ private fun ChapterListPane(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Text(
-                        text = book.titleAr,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = AmiriArabicFontFamily,
-                            fontSize = 20.sp,
-                            color = accentColor
-                        )
+                    AssistChip(
+                        onClick = onOpenQuickJump,
+                        label = { Text("হাদিস জাম্প") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.FindInPage,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        modifier = Modifier.testTag("book_quick_jump_button")
                     )
                 }
 
@@ -428,7 +456,7 @@ private fun ChapterListPane(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(filteredChapters, key = { it.id }) { chapter ->
+            items(filteredChapters, key = { it.id }, contentType = { "chapter_card" }) { chapter ->
                 val isSelected = selectedChapterId == chapter.id
                 Card(
                     modifier = Modifier
@@ -484,7 +512,7 @@ private fun ChapterListPane(
                                 }
                                 if (chapter.hadithRange.isNotBlank()) {
                                     Text(
-                                        text = "• ${chapter.hadithRange}",
+                                        text = "হাদিস: ${chapter.hadithRange.toBanglaDigits()}",
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -515,6 +543,7 @@ private fun HadithChapterReaderPane(
     highlightedHadithId: Int?,
     showBackButton: Boolean,
     onBack: () -> Unit,
+    onOpenQuickJump: () -> Unit,
     onBookmarkClick: (HadithEntity) -> Unit,
     onTopicClick: (String) -> Unit,
     onHadithViewed: (HadithEntity) -> Unit,
@@ -525,6 +554,9 @@ private fun HadithChapterReaderPane(
     val coroutineScope = rememberCoroutineScope()
     val sectionMap = remember(sections) { sections.associateBy { it.id } }
     val bookmarkMap = remember(bookmarks) { bookmarks.associateBy { it.hadithId } }
+    val showScrollToTop by remember {
+        androidx.compose.runtime.derivedStateOf { listState.firstVisibleItemIndex > 3 }
+    }
 
     LaunchedEffect(hadiths, highlightedHadithId) {
         if (hadiths.isNotEmpty()) {
@@ -537,75 +569,126 @@ private fun HadithChapterReaderPane(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        // Reader Sticky Top Bar
-        Surface(
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 3.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (showBackButton) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (showBackButton) {
+                            IconButton(
+                                onClick = onBack,
+                                modifier = Modifier.testTag("reader_back_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "অধ্যায় তালিকায় ফিরুন"
+                                )
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "${book.titleBn} • অধ্যায় ${chapter.chapterNumber.toBanglaDigits()}",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                            Text(
+                                text = chapter.titleBn,
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                         IconButton(
-                            onClick = onBack,
-                            modifier = Modifier.testTag("reader_back_button")
+                            onClick = onOpenQuickJump,
+                            modifier = Modifier.testTag("reader_quick_jump_button")
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "অধ্যায় তালিকায় ফিরুন"
+                                imageVector = Icons.Default.FindInPage,
+                                contentDescription = "হাদিস নম্বর জাম্প",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(
+                            onClick = onOpenTypographySheet,
+                            modifier = Modifier.testTag("reader_typography_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = "ফন্ট ও থিম সেটিংস",
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "${book.titleBn} • অধ্যায় ${chapter.chapterNumber.toBanglaDigits()}",
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        )
-                        Text(
-                            text = chapter.titleBn,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    IconButton(
-                        onClick = onOpenTypographySheet,
-                        modifier = Modifier.testTag("reader_typography_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = "ফন্ট ও থিম সেটিংস",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+
+                    if (hadiths.size > 1) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(top = 4.dp)
+                        ) {
+                            items(hadiths.size, key = { hadiths[it].id }, contentType = { "hadith_jump_chip" }) { index ->
+                                val h = hadiths[index]
+                                AssistChip(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            listState.animateScrollToItem(index)
+                                        }
+                                        onHadithViewed(h)
+                                    },
+                                    label = {
+                                        Text("হাদিস ${h.hadithNumber.toBanglaDigits()}")
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
+            }
 
-                // Quick Jump-to-Hadith Bar
-                if (hadiths.size > 1) {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(top = 4.dp)
-                    ) {
-                        items(hadiths.size) { index ->
-                            val h = hadiths[index]
-                            AssistChip(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        listState.animateScrollToItem(index)
-                                    }
-                                    onHadithViewed(h)
-                                },
-                                label = {
-                                    Text("হাদিস ${h.hadithNumber.toBanglaDigits()}")
-                                }
+            if (hadiths.isEmpty()) {
+                EmptyReaderPlaceholder("এই অধ্যায়ে এখনো কোনো হাদিস যুক্ত করা হয়নি")
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("hadith_reader_lazy_column"),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(
+                        count = hadiths.size,
+                        key = { hadiths[it].id },
+                        contentType = { "hadith_reader_item" }
+                    ) { index ->
+                        val hadith = hadiths[index]
+                        val prevSectionId = if (index > 0) hadiths[index - 1].sectionId else null
+                        val section = if (hadith.sectionId != prevSectionId) sectionMap[hadith.sectionId] else null
+                        val bookmark = bookmarkMap[hadith.id]
+
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (section != null && (section.titleBn.isNotBlank() || section.prefaceBn.isNotBlank())) {
+                                SectionPrefaceBanner(section = section)
+                            }
+
+                            ScholarHadithCard(
+                                hadith = hadith,
+                                preferences = preferences,
+                                isBookmarked = bookmark != null,
+                                savedCollectionName = bookmark?.collectionName,
+                                savedPersonalNote = bookmark?.personalNote,
+                                isHighlighted = highlightedHadithId == hadith.id,
+                                onBookmarkClick = { onBookmarkClick(hadith) },
+                                onTopicClick = onTopicClick
                             )
                         }
                     }
@@ -613,42 +696,80 @@ private fun HadithChapterReaderPane(
             }
         }
 
-        if (hadiths.isEmpty()) {
-            EmptyReaderPlaceholder("এই অধ্যায়ে এখনো কোনো হাদিস যুক্ত করা হয়নি")
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .testTag("hadith_reader_lazy_column"),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showScrollToTop,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(20.dp)
+        ) {
+            androidx.compose.material3.SmallFloatingActionButton(
+                onClick = {
+                    coroutineScope.launch { listState.animateScrollToItem(0) }
+                },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.testTag("hadith_scroll_to_top_fab")
             ) {
-                items(hadiths, key = { it.id }) { hadith ->
-                    val section = sectionMap[hadith.sectionId]
-                    val bookmark = bookmarkMap[hadith.id]
-
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        // Bab / Section Preface Card
-                        if (section != null) {
-                            SectionPrefaceBanner(section = section)
-                        }
-
-                        ScholarHadithCard(
-                            hadith = hadith,
-                            preferences = preferences,
-                            isBookmarked = bookmark != null,
-                            savedCollectionName = bookmark?.collectionName,
-                            savedPersonalNote = bookmark?.personalNote,
-                            isHighlighted = highlightedHadithId == hadith.id,
-                            onBookmarkClick = { onBookmarkClick(hadith) },
-                            onTopicClick = onTopicClick
-                        )
-                    }
-                }
+                Text(
+                    text = "↑ শীর্ষে",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 10.dp)
+                )
             }
         }
     }
+}
+
+@Composable
+private fun HadithQuickJumpDialog(
+    book: BookEntity,
+    onJump: (hadithNumber: Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var numberInput by remember { mutableStateOf("1") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "${book.titleBn} • হাদিস জাম্প",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "এই গ্রন্থের মোট ${book.hadithCount.toBanglaDigits()} টি হাদিসের মধ্যে যেকোনো হাদিস নম্বরে সরাসরি যেতে নিচে নম্বর লিখুন:",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+                OutlinedTextField(
+                    value = numberInput,
+                    onValueChange = { numberInput = it },
+                    label = { Text("হাদিস নম্বর (১ - ${book.hadithCount.toBanglaDigits()})") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val num = numberInput.trim().toEnglishDigits().toIntOrNull() ?: 1
+                    onJump(num.coerceAtLeast(1))
+                }
+            ) {
+                Text("হাদিসে যান")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("বাতিল")
+            }
+        }
+    )
 }
 
 @Composable
@@ -677,8 +798,13 @@ private fun SectionPrefaceBanner(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column {
+                val heading = if (section.titleBn.startsWith(section.sectionNumber)) {
+                    section.titleBn
+                } else {
+                    "${section.sectionNumber} ${section.titleBn}".trim()
+                }
                 Text(
-                    text = "${section.sectionNumber}: ${section.titleBn}",
+                    text = heading,
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSecondaryContainer

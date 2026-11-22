@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -9,10 +8,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,12 +20,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -39,7 +42,9 @@ import com.example.ui.theme.GradeSahihBg
 import com.example.ui.theme.GradeSahihText
 
 /**
- * Custom Canvas-drawn 8-pointed Rub el Hizb Islamic Geometric Medallion for Hadith & Chapter numbers.
+ * Custom 8-pointed Rub el Hizb Islamic Geometric Medallion drawn via `Modifier.drawWithCache`
+ * so `Stroke`, `Size`, and `Offset` calculations are cached across recompositions and scrolls
+ * (following Android Compose Graphics Performance guidelines).
  */
 @Composable
 fun RubElHizbMedallion(
@@ -50,39 +55,36 @@ fun RubElHizbMedallion(
     accentColor: Color = GoldAccent
 ) {
     Box(
-        modifier = modifier.size(size),
+        modifier = modifier
+            .size(size)
+            .drawWithCache {
+                val side = this.size.minDimension * 0.64f
+                val topLeft = Offset((this.size.width - side) / 2f, (this.size.height - side) / 2f)
+                val rectSize = Size(side, side)
+                val stroke = Stroke(width = 1.6.dp.toPx())
+                val fillAlphaColor = primaryColor.copy(alpha = 0.14f)
+                val innerCircleColor = primaryColor.copy(alpha = 0.08f)
+                val innerRadius = side * 0.42f
+
+                onDrawBehind {
+                    rotate(degrees = 0f) {
+                        drawRect(color = fillAlphaColor, topLeft = topLeft, size = rectSize)
+                        drawRect(color = accentColor, topLeft = topLeft, size = rectSize, style = stroke)
+                    }
+                    rotate(degrees = 45f) {
+                        drawRect(color = fillAlphaColor, topLeft = topLeft, size = rectSize)
+                        drawRect(color = accentColor, topLeft = topLeft, size = rectSize, style = stroke)
+                    }
+                    drawCircle(color = innerCircleColor, radius = innerRadius)
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.matchParentSize()) {
-            val side = this.size.minDimension * 0.64f
-            val topLeft = Offset((this.size.width - side) / 2f, (this.size.height - side) / 2f)
-
-            // Draw two overlapping rotated squares (Rub el Hizb 8-pointed star)
-            for (angle in listOf(0f, 45f)) {
-                rotate(degrees = angle) {
-                    drawRect(
-                        color = primaryColor.copy(alpha = 0.14f),
-                        topLeft = topLeft,
-                        size = Size(side, side)
-                    )
-                    drawRect(
-                        color = accentColor,
-                        topLeft = topLeft,
-                        size = Size(side, side),
-                        style = Stroke(width = 1.6.dp.toPx())
-                    )
-                }
-            }
-            drawCircle(
-                color = primaryColor.copy(alpha = 0.08f),
-                radius = side * 0.42f
-            )
-        }
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge.copy(
                 fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
+                fontSize = if (label.length >= 4) 11.sp else 13.sp,
                 color = primaryColor
             )
         )
@@ -90,7 +92,7 @@ fun RubElHizbMedallion(
 }
 
 /**
- * Color-coded Tahqiq (হাদিসের মান: সহীহ, হাসান, যঈফ) authenticity badge.
+ * Color-coded Tahqiq (হাদিসের মান: সহীহ, হাসান, যঈফ, জাল/মাওযূ) authenticity badge derived from grade_id.
  */
 @Composable
 fun TahqiqGradeBadge(
@@ -98,23 +100,44 @@ fun TahqiqGradeBadge(
     gradeType: String,
     modifier: Modifier = Modifier
 ) {
-    val (bgColor, textColor) = when (gradeType.uppercase()) {
-        "HASAN" -> GradeHasanBg to GradeHasanText
-        "DAIF" -> GradeDaifBg to GradeDaifText
-        else -> GradeSahihBg to GradeSahihText
+    val upper = gradeType.uppercase()
+    val bgColor: Color
+    val textColor: Color
+    val icon = when (upper) {
+        "HASAN" -> {
+            bgColor = GradeHasanBg
+            textColor = GradeHasanText
+            Icons.Default.Verified
+        }
+        "DAIF" -> {
+            bgColor = GradeDaifBg
+            textColor = GradeDaifText
+            Icons.Default.WarningAmber
+        }
+        "MAWDU" -> {
+            bgColor = Color(0xFFFADBD8)
+            textColor = Color(0xFF78281F)
+            Icons.Default.ErrorOutline
+        }
+        else -> {
+            bgColor = GradeSahihBg
+            textColor = GradeSahihText
+            Icons.Default.Verified
+        }
     }
 
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))
             .background(bgColor)
-            .border(1.dp, textColor.copy(alpha = 0.28f), RoundedCornerShape(50))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .border(1.dp, textColor.copy(alpha = 0.32f), RoundedCornerShape(50))
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .semantics { contentDescription = "তাহকীক মান: $gradeBn" },
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Default.Verified,
-            contentDescription = gradeBn,
+            imageVector = icon,
+            contentDescription = null,
             tint = textColor,
             modifier = Modifier.size(14.dp)
         )
@@ -131,50 +154,58 @@ fun TahqiqGradeBadge(
 }
 
 /**
- * Decorative Islamic Arch Header Divider drawn with Jetpack Compose Canvas.
+ * Decorative Islamic Arch Header Divider drawn with `Modifier.drawWithCache`
+ * to cache the `Path` object and reuse `Path.rewind()` across layout passes without heap allocations.
  */
 @Composable
 fun IslamicGeometricDivider(
     modifier: Modifier = Modifier,
     tint: Color = GoldAccent.copy(alpha = 0.45f)
 ) {
-    Canvas(modifier = modifier) {
-        val midY = size.height / 2f
-        val centerX = size.width / 2f
-        val diamondRadius = 6.dp.toPx()
+    val diamondPath = androidx.compose.runtime.remember { Path() }
+    Box(
+        modifier = modifier.drawWithCache {
+            val midY = size.height / 2f
+            val centerX = size.width / 2f
+            val diamondRadius = 6.dp.toPx()
+            val strokePx = 1.dp.toPx()
+            val dotRadius = 2.5.dp.toPx()
+            val sideInset = 16.dp.toPx()
 
-        drawLine(
-            color = tint,
-            start = Offset(16.dp.toPx(), midY),
-            end = Offset(centerX - diamondRadius * 3f, midY),
-            strokeWidth = 1.dp.toPx()
-        )
-        drawLine(
-            color = tint,
-            start = Offset(centerX + diamondRadius * 3f, midY),
-            end = Offset(size.width - 16.dp.toPx(), midY),
-            strokeWidth = 1.dp.toPx()
-        )
+            diamondPath.rewind()
+            diamondPath.moveTo(centerX, midY - diamondRadius)
+            diamondPath.lineTo(centerX + diamondRadius, midY)
+            diamondPath.lineTo(centerX, midY + diamondRadius)
+            diamondPath.lineTo(centerX - diamondRadius, midY)
+            diamondPath.close()
 
-        val diamondPath = Path().apply {
-            moveTo(centerX, midY - diamondRadius)
-            lineTo(centerX + diamondRadius, midY)
-            lineTo(centerX, midY + diamondRadius)
-            lineTo(centerX - diamondRadius, midY)
-            close()
+            onDrawBehind {
+                drawLine(
+                    color = tint,
+                    start = Offset(sideInset, midY),
+                    end = Offset(centerX - diamondRadius * 3f, midY),
+                    strokeWidth = strokePx
+                )
+                drawLine(
+                    color = tint,
+                    start = Offset(centerX + diamondRadius * 3f, midY),
+                    end = Offset(size.width - sideInset, midY),
+                    strokeWidth = strokePx
+                )
+                drawPath(path = diamondPath, color = tint)
+                drawCircle(
+                    color = tint,
+                    radius = dotRadius,
+                    center = Offset(centerX - diamondRadius * 2f, midY)
+                )
+                drawCircle(
+                    color = tint,
+                    radius = dotRadius,
+                    center = Offset(centerX + diamondRadius * 2f, midY)
+                )
+            }
         }
-        drawPath(path = diamondPath, color = tint)
-        drawCircle(
-            color = tint,
-            radius = 2.5.dp.toPx(),
-            center = Offset(centerX - diamondRadius * 2f, midY)
-        )
-        drawCircle(
-            color = tint,
-            radius = 2.5.dp.toPx(),
-            center = Offset(centerX + diamondRadius * 2f, midY)
-        )
-    }
+    )
 }
 
 /**
@@ -185,7 +216,8 @@ fun Int.toBanglaDigits(): String = this.toString().toBanglaDigits()
 fun String.toBanglaDigits(): String {
     val banglaNums = charArrayOf('০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯')
     val sb = StringBuilder(this.length)
-    for (ch in this) {
+    for (i in 0 until this.length) {
+        val ch = this[i]
         if (ch in '0'..'9') {
             sb.append(banglaNums[ch - '0'])
         } else {
@@ -196,12 +228,29 @@ fun String.toBanglaDigits(): String {
 }
 
 /**
- * Helper to strip Arabic Harakat/Tashkeel when the user toggles "হরকত ছাড়া আরবি".
+ * Helper to convert Bangla digits (০-৯) to English digits (0-9) for numeric searches and quick-jump inputs.
+ */
+fun String.toEnglishDigits(): String {
+    val sb = StringBuilder(this.length)
+    for (i in 0 until this.length) {
+        val ch = this[i]
+        when (ch) {
+            in '০'..'৯' -> sb.append((ch - '০' + '0'.code).toChar())
+            else -> sb.append(ch)
+        }
+    }
+    return sb.toString()
+}
+
+private val ARABIC_TASHKEEL_REGEX = Regex("[\\u064B-\\u065F\\u0670\\u06D6-\\u06ED]")
+
+/**
+ * Helper to strip Arabic Harakat/Tashkeel when the user toggles "হরকত ছাড়া আরবি"
+ * and no precomputed `ar_diacless` column is available.
  */
 fun String.stripArabicTashkeel(keepTashkeel: Boolean): String {
     if (keepTashkeel) return this
-    val tashkeelRegex = Regex("[\\u064B-\\u065F\\u0670]")
-    return this.replace(tashkeelRegex, "")
+    return this.replace(ARABIC_TASHKEEL_REGEX, "")
 }
 
 /**

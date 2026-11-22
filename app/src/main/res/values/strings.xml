@@ -1,16 +1,17 @@
 <resources>
-    <string name="app_name">আল হাদিস</string>
-    <string name="app_subtitle">বিশুদ্ধ হাদিস সংকলন ও গবেষণা</string>
+    <string name="app_name">আল হাদিস বাংলা</string>
+    <string name="app_subtitle">বিশুদ্ধ হাদিস সংকলন, তাহকীক ও আল-কুরআন গবেষণা</string>
     <string name="nav_home">হোম</string>
-    <string name="nav_books">গ্রন্থসমূহ</string>
+    <string name="nav_books">হাদিস গ্রন্থ</string>
+    <string name="nav_quran">আল-কুরআন</string>
     <string name="nav_search">অনুসন্ধান</string>
     <string name="nav_bookmarks">সংগ্রহ</string>
     <string name="nav_database">ডেটাবেস (.sqlite)</string>
-    <string name="search_hint">হাদিস নম্বর, শব্দ, রাবী বা বিষয় লিখে খুঁজুন…</string>
+    <string name="search_hint">হাদিস নম্বর, শব্দ, রাবী বা সূরা:আয়াত লিখে খুঁজুন…</string>
     <string name="daily_hadith_title">আজকের নির্বাচিত হাদিস</string>
     <string name="copy_hadith">হাদিস কপি করুন</string>
     <string name="share_hadith">হাদিস শেয়ার করুন</string>
     <string name="bookmark_hadith">বুকমার্ক করুন</string>
     <string name="explanation_title">সংক্ষিপ্ত ব্যাখ্যা ও শিক্ষা</string>
-    <string name="sqlite_folder_path">app/src/main/assets/databases/</string>
+    <string name="sqlite_folder_path">app/src/main/assets/databases/bangla-hadiths/</string>
 </resources>

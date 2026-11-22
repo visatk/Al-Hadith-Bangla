@@ -149,8 +149,15 @@ fun ScholarHadithCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 2. Sacred Arabic Text Block (Amiri Font, RTL aligned)
-            if (preferences.showArabic && hadith.arabicText.isNotBlank()) {
+            // 2. Sacred Arabic Text Block (Amiri Font, RTL aligned, uses ar / ar_diacless columns, text-selectable)
+            val resolvedArabicText = remember(hadith.arabicText, hadith.arabicTextDiacless, preferences.showTashkeel) {
+                if (preferences.showTashkeel) {
+                    hadith.arabicText.ifBlank { hadith.arabicTextDiacless }
+                } else {
+                    hadith.arabicTextDiacless.ifBlank { hadith.arabicText.stripArabicTashkeel(false) }
+                }
+            }
+            if (preferences.showArabic && resolvedArabicText.isNotBlank()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -163,18 +170,20 @@ fun ScholarHadithCard(
                         )
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    Text(
-                        text = hadith.arabicText.stripArabicTashkeel(preferences.showTashkeel),
-                        style = MaterialTheme.typography.displayMedium.copy(
-                            fontFamily = AmiriArabicFontFamily,
-                            fontSize = preferences.arabicFontSizeSp.sp,
-                            lineHeight = (preferences.arabicFontSizeSp * 1.72f).sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Right,
-                            textDirection = TextDirection.Rtl
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(
+                            text = resolvedArabicText,
+                            style = MaterialTheme.typography.displayMedium.copy(
+                                fontFamily = AmiriArabicFontFamily,
+                                fontSize = preferences.arabicFontSizeSp.sp,
+                                lineHeight = (preferences.arabicFontSizeSp * 1.72f).sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.Right,
+                                textDirection = TextDirection.Rtl
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(14.dp))
             }
@@ -200,16 +209,18 @@ fun ScholarHadithCard(
                 )
             }
 
-            // 4. Bangla Translation
-            Text(
-                text = hadith.banglaText,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontFamily = HindSiliguriBanglaFontFamily,
-                    fontSize = preferences.banglaFontSizeSp.sp,
-                    lineHeight = (preferences.banglaFontSizeSp * 1.62f).sp,
-                    color = MaterialTheme.colorScheme.onSurface
+            // 4. Bangla Translation (Selectable for scholarly study)
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(
+                    text = hadith.banglaText,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontFamily = HindSiliguriBanglaFontFamily,
+                        fontSize = preferences.banglaFontSizeSp.sp,
+                        lineHeight = (preferences.banglaFontSizeSp * 1.62f).sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 )
-            )
+            }
 
             // 5. Optional Transliteration (উচ্চারণ)
             if (preferences.showTransliteration && hadith.transliterationBn.isNotBlank()) {

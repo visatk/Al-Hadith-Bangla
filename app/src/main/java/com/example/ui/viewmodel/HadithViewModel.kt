@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.database.AppDatabase
+import com.example.data.local.entity.AyahEntity
 import com.example.data.local.entity.BookEntity
 import com.example.data.local.entity.BookmarkCollectionEntity
 import com.example.data.local.entity.BookmarkEntity
@@ -15,9 +16,12 @@ import com.example.data.local.entity.ReaderPreferences
 import com.example.data.local.entity.ReadingProgressEntity
 import com.example.data.local.entity.SectionEntity
 import com.example.data.local.entity.SqliteDatabaseFileReport
+import com.example.data.local.entity.SurahEntity
 import com.example.data.preferences.UserPreferencesRepository
 import com.example.data.repository.HadithRepository
+import com.example.data.sqlite.QuranJsonDataSource
 import com.example.data.sqlite.SqliteAssetDataSource
+import com.example.ui.components.toEnglishDigits
 import com.example.ui.theme.ReaderThemeMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +29,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -32,10 +37,17 @@ import kotlinx.coroutines.launch
 
 enum class AppDestination(val titleBn: String) {
     HOME("হোম"),
-    BOOKS("গ্রন্থসমূহ"),
+    BOOKS("হাদিস গ্রন্থ"),
+    QURAN("আল-কুরআন"),
     SEARCH("অনুসন্ধান"),
     BOOKMARKS("সংগ্রহ"),
     SQLITE_STUDIO("ডেটাবেস")
+}
+
+enum class SearchScopeFilter(val labelBn: String) {
+    ALL("সব (হাদিস ও কুরআন)"),
+    HADITH_ONLY("শুধু হাদিস"),
+    QURAN_ONLY("শুধু আল-কুরআন")
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -43,7 +55,12 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
 
     private val database = AppDatabase.getInstance(application)
     private val sqliteDataSource = SqliteAssetDataSource(application)
-    private val repository = HadithRepository(database.hadithDao(), sqliteDataSource)
+    private val quranDataSource = QuranJsonDataSource(application)
+    private val repository = HadithRepository(
+        hadithDao = database.hadithDao(),
+        sqliteAssetDataSource = sqliteDataSource,
+        quranJsonDataSource = quranDataSource
+    )
     private val preferencesRepo = UserPreferencesRepository(application)
 
     private val _currentDestination = MutableStateFlow(AppDestination.HOME)
@@ -58,8 +75,19 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
     private val _highlightedHadithId = MutableStateFlow<Int?>(null)
     val highlightedHadithId: StateFlow<Int?> = _highlightedHadithId.asStateFlow()
 
+    // Al-Quran State
+    private val _selectedSurah = MutableStateFlow<SurahEntity?>(null)
+    val selectedSurah: StateFlow<SurahEntity?> = _selectedSurah.asStateFlow()
+
+    private val _highlightedAyahNumber = MutableStateFlow<Int?>(null)
+    val highlightedAyahNumber: StateFlow<Int?> = _highlightedAyahNumber.asStateFlow()
+
+    // Unified Search State
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _searchScopeFilter = MutableStateFlow(SearchScopeFilter.ALL)
+    val searchScopeFilter: StateFlow<SearchScopeFilter> = _searchScopeFilter.asStateFlow()
 
     private val _searchBookFilter = MutableStateFlow<Int?>(null)
     val searchBookFilter: StateFlow<Int?> = _searchBookFilter.asStateFlow()
@@ -70,6 +98,12 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
     private val _sqliteReports = MutableStateFlow<List<SqliteDatabaseFileReport>>(emptyList())
     val sqliteReports: StateFlow<List<SqliteDatabaseFileReport>> = _sqliteReports.asStateFlow()
 
+    private val _totalIndexedHadiths = MutableStateFlow(0)
+    val totalIndexedHadiths: StateFlow<Int> = _totalIndexedHadiths.asStateFlow()
+
+    private val _totalIndexedAyahs = MutableStateFlow(0)
+    val totalIndexedAyahs: StateFlow<Int> = _totalIndexedAyahs.asStateFlow()
+
     private val _isSyncingSqlite = MutableStateFlow(false)
     val isSyncingSqlite: StateFlow<Boolean> = _isSyncingSqlite.asStateFlow()
 
@@ -79,7 +113,16 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
     val books: StateFlow<List<BookEntity>> = repository.allBooksFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val allHadiths: StateFlow<List<HadithEntity>> = repository.allHadithsFlow
+    val allHadiths: StateFlow<List<HadithEntity>> = repository.featuredHadithsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val surahs: StateFlow<List<SurahEntity>> = repository.allSurahsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val ayahsForSelectedSurah: StateFlow<List<AyahEntity>> = _selectedSurah
+        .flatMapLatest { surah ->
+            if (surah == null) flowOf(emptyList()) else repository.getAyahsBySurah(surah.id)
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val chaptersForSelectedBook: StateFlow<List<ChapterEntity>> = _selectedBook
@@ -103,11 +146,23 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
     val searchResults: StateFlow<List<HadithEntity>> = combine(
         _searchQuery,
         _searchBookFilter,
-        _searchGradeFilter
-    ) { query, bookId, gradeType ->
-        Triple(query, bookId, gradeType)
-    }.flatMapLatest { (query, bookId, gradeType) ->
-        repository.searchHadiths(query, bookId, gradeType)
+        _searchGradeFilter,
+        _searchScopeFilter
+    ) { query, bookId, gradeType, scope ->
+        if (scope == SearchScopeFilter.QURAN_ONLY) null else Triple(query.toEnglishDigits(), bookId, gradeType)
+    }.flatMapLatest { params ->
+        if (params == null) flowOf(emptyList())
+        else repository.searchHadiths(params.first, params.second, params.third)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val quranSearchResults: StateFlow<List<AyahEntity>> = combine(
+        _searchQuery,
+        _searchScopeFilter
+    ) { query, scope ->
+        if (scope == SearchScopeFilter.HADITH_ONLY) null else query.toEnglishDigits()
+    }.flatMapLatest { normalizedQuery ->
+        if (normalizedQuery.isNullOrBlank()) flowOf(emptyList())
+        else repository.searchAyahs(normalizedQuery)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val bookmarkedHadiths: StateFlow<List<BookmarkedHadithWithDetail>> = repository.bookmarkedHadithsFlow
@@ -126,14 +181,16 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ReaderPreferences())
 
     init {
-        refreshSqliteDatabases()
+        refreshSqliteDatabases(forceRefresh = false)
     }
 
-    fun refreshSqliteDatabases() {
+    fun refreshSqliteDatabases(forceRefresh: Boolean = true) {
         viewModelScope.launch {
             _isSyncingSqlite.value = true
-            val reports = repository.syncAllSqliteSourcesToRoom()
+            val reports = repository.syncAllSourcesToRoom(forceRefresh = forceRefresh)
             _sqliteReports.value = reports
+            _totalIndexedHadiths.value = repository.getTotalIndexedHadithCount()
+            _totalIndexedAyahs.value = repository.getTotalIndexedAyahCount()
             _isSyncingSqlite.value = false
         }
     }
@@ -143,8 +200,10 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
             _isSyncingSqlite.value = true
             val result = repository.importExternalSqliteFile(uri)
             result.onSuccess { fileName ->
-                val reports = repository.syncAllSqliteSourcesToRoom()
+                val reports = repository.syncAllSourcesToRoom(forceRefresh = true)
                 _sqliteReports.value = reports
+                _totalIndexedHadiths.value = repository.getTotalIndexedHadithCount()
+                _totalIndexedAyahs.value = repository.getTotalIndexedAyahCount()
                 _statusBannerMessage.value = "সফলভাবে '$fileName' ডেটাবেস যুক্ত ও ইনডেক্স করা হয়েছে!"
             }.onFailure { err ->
                 _statusBannerMessage.value = "ডেটাবেস ইম্পোর্ট ব্যর্থ: ${err.localizedMessage}"
@@ -181,16 +240,60 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val book = books.value.firstOrNull { it.id == hadith.bookId } ?: return@launch
             _selectedBook.value = book
-            repository.getChaptersByBook(book.id).collect { chapters ->
-                val chapter = chapters.firstOrNull { it.id == hadith.chapterId } ?: chapters.firstOrNull()
-                if (chapter != null) {
-                    _selectedChapter.value = chapter
-                    _highlightedHadithId.value = hadith.id
-                    _currentDestination.value = AppDestination.BOOKS
-                    repository.recordReadingProgress(book, chapter, hadith)
-                }
-                return@collect
+            val chapters = repository.getChaptersByBook(book.id).first()
+            val chapter = chapters.firstOrNull { it.id == hadith.chapterId } ?: chapters.firstOrNull()
+            if (chapter != null) {
+                _selectedChapter.value = chapter
+                _highlightedHadithId.value = hadith.id
+                _currentDestination.value = AppDestination.BOOKS
+                repository.recordReadingProgress(book, chapter, hadith)
             }
+        }
+    }
+
+    fun jumpToHadithNumberInBook(book: BookEntity, hadithNumber: Int) {
+        viewModelScope.launch {
+            val target = repository.findHadithByBookAndNumber(book.id, hadithNumber)
+            if (target != null) {
+                openHadithFromAnywhere(target)
+                _statusBannerMessage.value = "${book.titleBn} • হাদিস #${target.hadithNumber}-এ নেওয়া হয়েছে"
+            } else {
+                _statusBannerMessage.value = "${book.titleBn}-এ হাদিস নং #$hadithNumber পাওয়া যায়নি"
+            }
+        }
+    }
+
+    fun openSurah(surah: SurahEntity, highlightAyahNumber: Int? = null) {
+        _selectedSurah.value = surah
+        _highlightedAyahNumber.value = highlightAyahNumber
+        _currentDestination.value = AppDestination.QURAN
+    }
+
+    fun openAyahFromSearch(ayah: AyahEntity) {
+        val targetSurah = surahs.value.firstOrNull { it.id == ayah.surahId }
+        if (targetSurah != null) {
+            openSurah(targetSurah, highlightAyahNumber = ayah.ayahNumber)
+        }
+    }
+
+    fun jumpToSurahAndAyah(surahId: Int, ayahNumber: Int) {
+        val targetSurah = surahs.value.firstOrNull { it.id == surahId }
+        if (targetSurah != null) {
+            val validAyah = ayahNumber.coerceIn(1, targetSurah.totalVerses.coerceAtLeast(1))
+            openSurah(targetSurah, highlightAyahNumber = validAyah)
+            _statusBannerMessage.value = "সূরা ${targetSurah.nameBn} • আয়াত #$validAyah-এ নেওয়া হয়েছে"
+        } else {
+            _statusBannerMessage.value = "সূরা নং #$surahId পাওয়া যায়নি (১-১১৪ এর মধ্যে দিন)"
+        }
+    }
+
+    fun navigateBackInQuran(): Boolean {
+        return if (_selectedSurah.value != null) {
+            _selectedSurah.value = null
+            _highlightedAyahNumber.value = null
+            true
+        } else {
+            false
         }
     }
 
@@ -213,11 +316,16 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
         _searchQuery.value = topicTag
         _searchBookFilter.value = null
         _searchGradeFilter.value = null
+        _searchScopeFilter.value = SearchScopeFilter.ALL
         _currentDestination.value = AppDestination.SEARCH
     }
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
+    }
+
+    fun updateSearchScopeFilter(scope: SearchScopeFilter) {
+        _searchScopeFilter.value = scope
     }
 
     fun updateSearchBookFilter(bookId: Int?) {

@@ -74,10 +74,14 @@ import com.example.ui.theme.GoldLight
 fun HomeScreen(
     books: List<BookEntity>,
     allHadiths: List<HadithEntity>,
+    totalIndexedHadiths: Int,
+    totalSurahs: Int,
+    totalAyahs: Int,
     readingProgress: ReadingProgressEntity?,
     sqliteReports: List<SqliteDatabaseFileReport>,
     onBookClick: (BookEntity) -> Unit,
     onHadithClick: (HadithEntity) -> Unit,
+    onOpenQuranClick: () -> Unit,
     onContinueReadingClick: (ReadingProgressEntity) -> Unit,
     onSearchBarClick: () -> Unit,
     onTopicClick: (String) -> Unit,
@@ -86,11 +90,12 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val featuredHadith = remember(allHadiths) {
-        allHadiths.firstOrNull { it.id == 1 } ?: allHadiths.firstOrNull()
+        allHadiths.firstOrNull { it.arabicText.isNotBlank() && it.banglaText.isNotBlank() }
+            ?: allHadiths.firstOrNull()
     }
 
     val popularTopics = remember {
-        listOf("ঈমান", "সালাত", "ইলম", "ইখলাস", "আখলাক", "তাকওয়া", "পবিত্রতা", "প্রতিবেশী")
+        listOf("ঈমান", "সালাত", "ইলম", "ইখলাস", "আখলাক", "তাকওয়া", "পবিত্রতা", "দুআ ও যিকর")
     }
 
     LazyColumn(
@@ -105,10 +110,20 @@ fun HomeScreen(
             HeroSanctuaryHeader(
                 sqliteCount = sqliteReports.size,
                 totalBooks = books.size,
-                totalIndexedHadiths = allHadiths.size,
+                totalIndexedHadiths = if (totalIndexedHadiths > 0) totalIndexedHadiths else books.sumOf { it.hadithCount },
                 onSearchBarClick = onSearchBarClick,
                 onSqliteStudioClick = onSqliteStudioClick,
                 onTypographySettingsClick = onTypographySettingsClick
+            )
+        }
+
+        // 1b. Al-Quran Sanctuary Quick Access Banner
+        item {
+            AlQuranQuickAccessCard(
+                totalSurahs = if (totalSurahs > 0) totalSurahs else 114,
+                totalAyahs = if (totalAyahs > 0) totalAyahs else 6236,
+                onClick = onOpenQuranClick,
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
 
@@ -436,6 +451,75 @@ private fun HeroSanctuaryHeader(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AlQuranQuickAccessCard(
+    totalSurahs: Int,
+    totalAyahs: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = GoldAccent.copy(alpha = 0.55f),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .clip(RoundedCornerShape(20.dp))
+            .clickable { onClick() }
+            .testTag("home_quran_quick_card"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = EmeraldDeep
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                RubElHizbMedallion(
+                    label = "কুরআন",
+                    size = 48.dp,
+                    primaryColor = GoldLight,
+                    accentColor = GoldAccent
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "আল-কুরআনুল কারীম (বাংলা অনুবাদ)",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    )
+                    Text(
+                        text = "${totalSurahs.toBanglaDigits()} টি সূরা • ${totalAyahs.toBanglaDigits()} টি আয়াত • সূরা ও আয়াত জাম্প",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = GoldLight
+                        )
+                    )
+                }
+            }
+            Text(
+                text = "القرآن",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = AmiriArabicFontFamily,
+                    color = GoldLight,
+                    fontSize = 22.sp
+                )
+            )
         }
     }
 }

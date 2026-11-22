@@ -3,6 +3,7 @@ package com.example.data.local.entity
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.example.ui.theme.ReaderThemeMode
 
@@ -18,10 +19,13 @@ data class BookEntity(
     @ColumnInfo(name = "book_code") val bookCode: String,
     @ColumnInfo(name = "accent_hex") val accentHex: String,
     @ColumnInfo(name = "description_bn") val descriptionBn: String,
-    @ColumnInfo(name = "source_file") val sourceFile: String = "al_hadith_kutub_sittah.sqlite"
+    @ColumnInfo(name = "source_file") val sourceFile: String = "bn_hadis-somvar.sqlite"
 )
 
-@Entity(tableName = "chapters")
+@Entity(
+    tableName = "chapters",
+    indices = [Index(value = ["book_id"])]
+)
 data class ChapterEntity(
     @PrimaryKey val id: Int,
     @ColumnInfo(name = "book_id") val bookId: Int,
@@ -32,7 +36,10 @@ data class ChapterEntity(
     @ColumnInfo(name = "hadith_count") val hadithCount: Int
 )
 
-@Entity(tableName = "sections")
+@Entity(
+    tableName = "sections",
+    indices = [Index(value = ["chapter_id"]), Index(value = ["book_id"])]
+)
 data class SectionEntity(
     @PrimaryKey val id: Int,
     @ColumnInfo(name = "book_id") val bookId: Int,
@@ -42,7 +49,15 @@ data class SectionEntity(
     @ColumnInfo(name = "preface_bn") val prefaceBn: String
 )
 
-@Entity(tableName = "hadiths")
+@Entity(
+    tableName = "hadiths",
+    indices = [
+        Index(value = ["book_id"]),
+        Index(value = ["chapter_id"]),
+        Index(value = ["hadith_number"]),
+        Index(value = ["grade_type"])
+    ]
+)
 data class HadithEntity(
     @PrimaryKey val id: Int,
     @ColumnInfo(name = "book_id") val bookId: Int,
@@ -51,14 +66,42 @@ data class HadithEntity(
     @ColumnInfo(name = "hadith_number") val hadithNumber: Int,
     @ColumnInfo(name = "international_number") val internationalNumber: String,
     @ColumnInfo(name = "arabic_text") val arabicText: String,
+    @ColumnInfo(name = "arabic_text_diacless") val arabicTextDiacless: String = "",
     @ColumnInfo(name = "bangla_text") val banglaText: String,
     @ColumnInfo(name = "transliteration_bn") val transliterationBn: String,
     @ColumnInfo(name = "narrator_bn") val narratorBn: String,
     @ColumnInfo(name = "explanation_bn") val explanationBn: String,
+    @ColumnInfo(name = "grade_id") val gradeId: Int = 2,
     @ColumnInfo(name = "grade_bn") val gradeBn: String,
-    @ColumnInfo(name = "grade_type") val gradeType: String, // SAHIH, HASAN, DAIF
+    @ColumnInfo(name = "grade_type") val gradeType: String, // SAHIH, HASAN, DAIF, MAWDU
     @ColumnInfo(name = "reference_bn") val referenceBn: String,
     @ColumnInfo(name = "topic_tags") val topicTags: String
+)
+
+@Entity(tableName = "surahs")
+data class SurahEntity(
+    @PrimaryKey val id: Int,
+    @ColumnInfo(name = "name_ar") val nameAr: String,
+    @ColumnInfo(name = "transliteration_en") val transliterationEn: String,
+    @ColumnInfo(name = "name_bn") val nameBn: String,
+    @ColumnInfo(name = "meaning_bn") val meaningBn: String,
+    @ColumnInfo(name = "revelation_type") val revelationType: String, // meccan or medinan
+    @ColumnInfo(name = "revelation_bn") val revelationBn: String, // মাক্কী or মাদানী
+    @ColumnInfo(name = "total_verses") val totalVerses: Int
+)
+
+@Entity(
+    tableName = "ayahs",
+    indices = [Index(value = ["surah_id"]), Index(value = ["ayah_number"])]
+)
+data class AyahEntity(
+    @PrimaryKey val id: Int, // surahId * 1000 + ayahNumber
+    @ColumnInfo(name = "surah_id") val surahId: Int,
+    @ColumnInfo(name = "surah_name_bn") val surahNameBn: String,
+    @ColumnInfo(name = "surah_name_ar") val surahNameAr: String,
+    @ColumnInfo(name = "ayah_number") val ayahNumber: Int,
+    @ColumnInfo(name = "arabic_text") val arabicText: String,
+    @ColumnInfo(name = "bangla_translation") val banglaTranslation: String
 )
 
 @Entity(tableName = "bookmark_collections")
@@ -98,7 +141,7 @@ data class BookmarkedHadithWithDetail(
 
 data class SqliteDatabaseFileReport(
     val fileName: String,
-    val originType: String, // "ASSETS_FOLDER" or "USER_IMPORTED"
+    val originType: String, // "ASSETS_FOLDER", "QURAN_JSON", or "USER_IMPORTED"
     val relativePath: String,
     val fileSizeKb: Long,
     val detectedTables: List<String>,

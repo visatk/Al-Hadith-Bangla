@@ -2,6 +2,7 @@ package com.example.data.repository
 
 import android.net.Uri
 import com.example.data.local.dao.HadithDao
+import com.example.data.local.entity.AyahEntity
 import com.example.data.local.entity.BookEntity
 import com.example.data.local.entity.BookmarkCollectionEntity
 import com.example.data.local.entity.BookmarkEntity
@@ -11,16 +12,20 @@ import com.example.data.local.entity.HadithEntity
 import com.example.data.local.entity.ReadingProgressEntity
 import com.example.data.local.entity.SectionEntity
 import com.example.data.local.entity.SqliteDatabaseFileReport
+import com.example.data.local.entity.SurahEntity
+import com.example.data.sqlite.QuranJsonDataSource
 import com.example.data.sqlite.SqliteAssetDataSource
 import kotlinx.coroutines.flow.Flow
 
 class HadithRepository(
     private val hadithDao: HadithDao,
-    private val sqliteAssetDataSource: SqliteAssetDataSource
+    private val sqliteAssetDataSource: SqliteAssetDataSource,
+    private val quranJsonDataSource: QuranJsonDataSource
 ) {
 
     val allBooksFlow: Flow<List<BookEntity>> = hadithDao.getAllBooks()
-    val allHadithsFlow: Flow<List<HadithEntity>> = hadithDao.getAllHadiths()
+    val featuredHadithsFlow: Flow<List<HadithEntity>> = hadithDao.getFeaturedHadiths()
+    val allSurahsFlow: Flow<List<SurahEntity>> = hadithDao.getAllSurahs()
     val bookmarkedHadithsFlow: Flow<List<BookmarkedHadithWithDetail>> = hadithDao.getBookmarkedHadiths()
     val rawBookmarksFlow: Flow<List<BookmarkEntity>> = hadithDao.getAllBookmarksRaw()
     val bookmarkCollectionsFlow: Flow<List<BookmarkCollectionEntity>> = hadithDao.getBookmarkCollections()
@@ -35,6 +40,16 @@ class HadithRepository(
     fun getHadithsByChapter(chapterId: Int): Flow<List<HadithEntity>> =
         hadithDao.getHadithsByChapter(chapterId)
 
+    fun getAyahsBySurah(surahId: Int): Flow<List<AyahEntity>> =
+        hadithDao.getAyahsBySurah(surahId)
+
+    suspend fun findHadithByBookAndNumber(bookId: Int, hadithNumber: Int): HadithEntity? =
+        hadithDao.findHadithByBookAndNumber(bookId, hadithNumber)
+
+    suspend fun getTotalIndexedHadithCount(): Int = hadithDao.getHadithCount()
+
+    suspend fun getTotalIndexedAyahCount(): Int = hadithDao.getAyahCount()
+
     fun searchHadiths(
         query: String,
         bookId: Int?,
@@ -45,7 +60,10 @@ class HadithRepository(
         gradeType = gradeType
     )
 
-    suspend fun syncAllSqliteSourcesToRoom(): List<SqliteDatabaseFileReport> {
+    fun searchAyahs(query: String): Flow<List<AyahEntity>> =
+        hadithDao.searchAyahs(query.trim())
+
+    suspend fun syncAllSourcesToRoom(forceRefresh: Boolean = false): List<SqliteDatabaseFileReport> {
         // Ensure default bookmark collections exist
         if (hadithDao.getCollectionCount() == 0) {
             hadithDao.insertBookmarkCollection(
@@ -59,20 +77,59 @@ class HadithRepository(
             )
         }
 
+        val reports = mutableListOf<SqliteDatabaseFileReport>()
+
+        // 1. Scan & Sync Hadith SQLite databases
         val bundle = sqliteAssetDataSource.scanAndParseAllSqliteSources()
-        if (bundle.books.isNotEmpty()) {
-            hadithDao.insertBooks(bundle.books)
+        reports.addAll(bundle.reports)
+
+        if (forceRefresh) {
+            hadithDao.clearBooks()
+            hadithDao.clearChapters()
+            hadithDao.clearSections()
+            hadithDao.clearHadiths()
         }
-        if (bundle.chapters.isNotEmpty()) {
-            hadithDao.insertChapters(bundle.chapters)
+
+        val currentHadithCount = hadithDao.getHadithCount()
+        if (forceRefresh || currentHadithCount != bundle.hadiths.size) {
+            if (bundle.books.isNotEmpty()) {
+                hadithDao.insertBooks(bundle.books)
+            }
+            if (bundle.chapters.isNotEmpty()) {
+                hadithDao.insertChapters(bundle.chapters)
+            }
+            if (bundle.sections.isNotEmpty()) {
+                for (chunk in bundle.sections.chunked(800)) {
+                    hadithDao.insertSections(chunk)
+                }
+            }
+            if (bundle.hadiths.isNotEmpty()) {
+                for (chunk in bundle.hadiths.chunked(800)) {
+                    hadithDao.insertHadiths(chunk)
+                }
+            }
         }
-        if (bundle.sections.isNotEmpty()) {
-            hadithDao.insertSections(bundle.sections)
+
+        // 2. Scan & Sync Al-Quran JSON database (quran_bn.json)
+        val quranBundle = quranJsonDataSource.parseQuranFromAssets()
+        if (quranBundle.report != null) {
+            reports.add(quranBundle.report)
         }
-        if (bundle.hadiths.isNotEmpty()) {
-            hadithDao.insertHadiths(bundle.hadiths)
+
+        val currentSurahCount = hadithDao.getSurahCount()
+        val currentAyahCount = hadithDao.getAyahCount()
+        if (forceRefresh || currentSurahCount != quranBundle.surahs.size || currentAyahCount != quranBundle.ayahs.size) {
+            if (quranBundle.surahs.isNotEmpty()) {
+                hadithDao.insertSurahs(quranBundle.surahs)
+            }
+            if (quranBundle.ayahs.isNotEmpty()) {
+                for (chunk in quranBundle.ayahs.chunked(1000)) {
+                    hadithDao.insertAyahs(chunk)
+                }
+            }
         }
-        return bundle.reports
+
+        return reports
     }
 
     suspend fun importExternalSqliteFile(uri: Uri): Result<String> {

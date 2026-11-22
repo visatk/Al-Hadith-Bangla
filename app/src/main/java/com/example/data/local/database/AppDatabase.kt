@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.data.local.dao.HadithDao
+import com.example.data.local.entity.AyahEntity
 import com.example.data.local.entity.BookEntity
 import com.example.data.local.entity.BookmarkCollectionEntity
 import com.example.data.local.entity.BookmarkEntity
@@ -12,6 +13,7 @@ import com.example.data.local.entity.ChapterEntity
 import com.example.data.local.entity.HadithEntity
 import com.example.data.local.entity.ReadingProgressEntity
 import com.example.data.local.entity.SectionEntity
+import com.example.data.local.entity.SurahEntity
 
 @Database(
     entities = [
@@ -19,11 +21,13 @@ import com.example.data.local.entity.SectionEntity
         ChapterEntity::class,
         SectionEntity::class,
         HadithEntity::class,
+        SurahEntity::class,
+        AyahEntity::class,
         BookmarkCollectionEntity::class,
         BookmarkEntity::class,
         ReadingProgressEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
