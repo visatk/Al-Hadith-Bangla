@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +21,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Search
@@ -41,18 +42,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.R
 import com.example.data.local.entity.BookmarkCollectionEntity
 import com.example.data.local.entity.BookmarkedHadithWithDetail
 import com.example.data.local.entity.HadithEntity
 import com.example.data.local.entity.ReaderPreferences
 import com.example.ui.components.ScholarHadithCard
 import com.example.ui.components.toBanglaDigits
+import com.example.ui.theme.GoldAccent
 
 @Composable
 fun BookmarksScreen(
@@ -183,13 +189,20 @@ fun BookmarksScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.BookmarkBorder,
+                    Image(
+                        painter = painterResource(id = R.drawable.img_scholar_empty_ornament_1795432153586),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                        modifier = Modifier.size(56.dp)
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(width = 148.dp, height = 110.dp)
+                            .clip(RoundedCornerShape(22.dp))
+                            .border(
+                                width = 1.dp,
+                                color = GoldAccent.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(22.dp)
+                            )
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Text(
                         text = "এই ফোল্ডারে এখনো কোনো হাদিস সংরক্ষিত নেই",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),

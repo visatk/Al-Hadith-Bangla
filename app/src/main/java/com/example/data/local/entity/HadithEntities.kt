@@ -6,6 +6,8 @@ import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.ui.theme.ArabicFontStyle
+import com.example.ui.theme.BanglaFontStyle
 import com.example.ui.theme.ReaderThemeMode
 
 @Immutable
@@ -182,5 +184,7 @@ data class ReaderPreferences(
     val showTashkeel: Boolean = true,
     val eyeCareWarmFilter: Float = 0.0f, // 0.0f..0.28f amber blue-light filter
     val keepScreenOnWhileReading: Boolean = true,
-    val themeMode: ReaderThemeMode = ReaderThemeMode.MANUSCRIPT_LIGHT
+    val themeMode: ReaderThemeMode = ReaderThemeMode.MANUSCRIPT_LIGHT,
+    val arabicFontStyle: ArabicFontStyle = ArabicFontStyle.AMIRI,
+    val banglaFontStyle: BanglaFontStyle = BanglaFontStyle.HIND_SILIGURI
 )

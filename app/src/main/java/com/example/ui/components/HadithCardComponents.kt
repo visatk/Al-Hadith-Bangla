@@ -74,9 +74,9 @@ import androidx.compose.ui.unit.sp
 import com.example.data.local.entity.BookmarkCollectionEntity
 import com.example.data.local.entity.HadithEntity
 import com.example.data.local.entity.ReaderPreferences
-import com.example.ui.theme.AmiriArabicFontFamily
+import com.example.ui.theme.ArabicFontStyle
+import com.example.ui.theme.BanglaFontStyle
 import com.example.ui.theme.GoldAccent
-import com.example.ui.theme.HindSiliguriBanglaFontFamily
 import com.example.ui.theme.ReaderThemeMode
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -173,10 +173,10 @@ fun ScholarHadithCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
                         .border(
                             width = 1.dp,
-                            color = GoldAccent.copy(alpha = 0.25f),
+                            color = GoldAccent.copy(alpha = 0.28f),
                             shape = RoundedCornerShape(16.dp)
                         )
                         .padding(horizontal = 16.dp, vertical = 16.dp)
@@ -185,9 +185,9 @@ fun ScholarHadithCard(
                         Text(
                             text = resolvedArabicText,
                             style = MaterialTheme.typography.displayMedium.copy(
-                                fontFamily = AmiriArabicFontFamily,
+                                fontFamily = preferences.arabicFontStyle.fontFamily,
                                 fontSize = preferences.arabicFontSizeSp.sp,
-                                lineHeight = (preferences.arabicFontSizeSp * (preferences.lineHeightMultiplier + 0.12f)).sp,
+                                lineHeight = (preferences.arabicFontSizeSp * (preferences.lineHeightMultiplier + 0.14f)).sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 textAlign = TextAlign.Right,
                                 textDirection = TextDirection.Rtl
@@ -227,7 +227,7 @@ fun ScholarHadithCard(
                 Text(
                     text = hadith.banglaText,
                     style = MaterialTheme.typography.bodyLarge.copy(
-                        fontFamily = HindSiliguriBanglaFontFamily,
+                        fontFamily = preferences.banglaFontStyle.fontFamily,
                         fontSize = preferences.banglaFontSizeSp.sp,
                         lineHeight = (preferences.banglaFontSizeSp * preferences.lineHeightMultiplier).sp,
                         color = MaterialTheme.colorScheme.onSurface
@@ -476,7 +476,7 @@ fun shareHadithIntent(context: Context, hadith: HadithEntity) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ReaderTypographyBottomSheet(
     preferences: ReaderPreferences,
@@ -489,6 +489,17 @@ fun ReaderTypographyBottomSheet(
     onToggleExplanation: (Boolean) -> Unit,
     onToggleTashkeel: (Boolean) -> Unit,
     onThemeModeChange: (ReaderThemeMode) -> Unit,
+    onArabicFontStyleChange: (ArabicFontStyle) -> Unit = {},
+    onBanglaFontStyleChange: (BanglaFontStyle) -> Unit = {},
+    onApplyPreset: ((
+        arabicSizeSp: Float,
+        banglaSizeSp: Float,
+        lineHeight: Float,
+        warmFilter: Float,
+        themeMode: ReaderThemeMode,
+        arabicFontStyle: ArabicFontStyle,
+        banglaFontStyle: BanglaFontStyle
+    ) -> Unit)? = null,
     onImportSqliteDatabase: ((android.net.Uri) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
@@ -512,7 +523,7 @@ fun ReaderTypographyBottomSheet(
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
             Text(
-                text = "পাঠের আরাম ও ফন্ট সেটিংস",
+                text = "পাঠের আরাম, ফন্ট ও থিম স্টুডিও",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -520,7 +531,7 @@ fun ReaderTypographyBottomSheet(
                 modifier = Modifier.semantics { heading() }
             )
             Text(
-                text = "মনোযোগ ধরে রাখতে ও চোখের আরামের জন্য ফন্ট, লাইন স্পেসিং ও থিম কাস্টমাইজ করুন",
+                text = "মনোযোগ ধরে রাখতে ও চোখের আরামের জন্য আরবি-বাংলা ফন্ট, লাইন স্পেসিং ও থিম কাস্টমাইজ করুন",
                 style = MaterialTheme.typography.bodySmall.copy(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -531,7 +542,7 @@ fun ReaderTypographyBottomSheet(
             // Live Typography Preview Card
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(
@@ -542,13 +553,25 @@ fun ReaderTypographyBottomSheet(
                     .testTag("typography_live_preview_card")
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = "লাইভ প্রিভিউ",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "লাইভ প্রিভিউ",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
                         )
-                    )
+                        Text(
+                            text = "${preferences.arabicFontStyle.titleBn} • ${preferences.banglaFontStyle.titleBn}",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                    }
                     if (preferences.showArabic) {
                         Spacer(modifier = Modifier.height(6.dp))
                         val previewArabic = "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ"
@@ -556,9 +579,9 @@ fun ReaderTypographyBottomSheet(
                         Text(
                             text = previewArabic,
                             style = MaterialTheme.typography.displayMedium.copy(
-                                fontFamily = AmiriArabicFontFamily,
+                                fontFamily = preferences.arabicFontStyle.fontFamily,
                                 fontSize = preferences.arabicFontSizeSp.sp,
-                                lineHeight = (preferences.arabicFontSizeSp * (preferences.lineHeightMultiplier + 0.12f)).sp,
+                                lineHeight = (preferences.arabicFontSizeSp * (preferences.lineHeightMultiplier + 0.14f)).sp,
                                 textAlign = TextAlign.Right,
                                 textDirection = TextDirection.Rtl,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -570,7 +593,7 @@ fun ReaderTypographyBottomSheet(
                     Text(
                         text = "নিশ্চয়ই সকল আমল নিয়তের উপর নির্ভরশীল এবং প্রত্যেকে তাই পাবে যা সে নিয়ত করে।",
                         style = MaterialTheme.typography.bodyLarge.copy(
-                            fontFamily = HindSiliguriBanglaFontFamily,
+                            fontFamily = preferences.banglaFontStyle.fontFamily,
                             fontSize = preferences.banglaFontSizeSp.sp,
                             lineHeight = (preferences.banglaFontSizeSp * preferences.lineHeightMultiplier).sp,
                             color = MaterialTheme.colorScheme.onSurface
@@ -579,24 +602,183 @@ fun ReaderTypographyBottomSheet(
                 }
             }
 
+            // One-Tap Parametric Reading Presets
+            if (onApplyPreset != null) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = "দ্রুত রিডিং প্রিসেট (এক ট্যাপে সেটআপ)",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    AssistChip(
+                        onClick = {
+                            onApplyPreset(
+                                26f,
+                                17f,
+                                1.65f,
+                                0f,
+                                ReaderThemeMode.MANUSCRIPT_LIGHT,
+                                ArabicFontStyle.AMIRI,
+                                BanglaFontStyle.HIND_SILIGURI
+                            )
+                        },
+                        label = { Text("প্রামাণিক দারস") },
+                        modifier = Modifier.testTag("preset_standard_dars")
+                    )
+                    AssistChip(
+                        onClick = {
+                            onApplyPreset(
+                                32f,
+                                20f,
+                                1.80f,
+                                0.04f,
+                                ReaderThemeMode.SEPIA_SCHOLAR,
+                                ArabicFontStyle.SCHEHERAZADE,
+                                BanglaFontStyle.NOTO_SERIF_BENGALI
+                            )
+                        },
+                        label = { Text("বড় অক্ষর (স্বস্তিদায়ক)") },
+                        modifier = Modifier.testTag("preset_comfort_large")
+                    )
+                    AssistChip(
+                        onClick = {
+                            onApplyPreset(
+                                28f,
+                                18f,
+                                1.75f,
+                                0.10f,
+                                ReaderThemeMode.TAHAJJUD_DARK,
+                                ArabicFontStyle.SCHEHERAZADE,
+                                BanglaFontStyle.HIND_SILIGURI
+                            )
+                        },
+                        label = { Text("তাহাজ্জুদ নাইট") },
+                        modifier = Modifier.testTag("preset_tahajjud_night")
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Theme selector chips
+            // Theme selector cards with live color swatches
             Text(
-                text = "রিডিং থিম পরিবেশ",
+                text = "রিডিং থিম ও কালার প্যালেট",
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 ReaderThemeMode.entries.forEach { mode ->
+                    val isSelected = preferences.themeMode == mode
                     FilterChip(
-                        selected = preferences.themeMode == mode,
+                        selected = isSelected,
                         onClick = { onThemeModeChange(mode) },
+                        leadingIcon = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy((-4).dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(CircleShape)
+                                        .background(mode.bgPreview)
+                                        .border(1.dp, mode.primaryPreview, CircleShape)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(CircleShape)
+                                        .background(mode.primaryPreview)
+                                        .border(1.dp, mode.accentPreview, CircleShape)
+                                )
+                            }
+                        },
                         label = { Text(mode.titleBn) },
                         modifier = Modifier.testTag("theme_chip_${mode.name}")
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Arabic Font Family Selector
+            Text(
+                text = "আরবি লিপি (Arabic Font Family)",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                ArabicFontStyle.entries.forEach { style ->
+                    FilterChip(
+                        selected = preferences.arabicFontStyle == style,
+                        onClick = { onArabicFontStyleChange(style) },
+                        label = {
+                            Column(modifier = Modifier.padding(vertical = 2.dp)) {
+                                Text(
+                                    text = style.titleBn,
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                                Text(
+                                    text = "بِسْمِ اللَّهِ • ${style.subtitleBn}",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = style.fontFamily,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        },
+                        modifier = Modifier.testTag("arabic_font_chip_${style.name}")
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Bangla Font Family Selector
+            Text(
+                text = "বাংলা ফন্ট শৈলী (Bangla Typography)",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                BanglaFontStyle.entries.forEach { style ->
+                    FilterChip(
+                        selected = preferences.banglaFontStyle == style,
+                        onClick = { onBanglaFontStyleChange(style) },
+                        label = {
+                            Column(modifier = Modifier.padding(vertical = 2.dp)) {
+                                Text(
+                                    text = style.titleBn,
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontFamily = style.fontFamily
+                                    )
+                                )
+                                Text(
+                                    text = style.subtitleBn,
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = style.fontFamily,
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        },
+                        modifier = Modifier.testTag("bangla_font_chip_${style.name}")
                     )
                 }
             }
@@ -609,7 +791,7 @@ fun ReaderTypographyBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "আরবি ফন্ট সাইজ (Amiri)",
+                    text = "আরবি ফন্ট সাইজ (${preferences.arabicFontStyle.titleBn})",
                     style = MaterialTheme.typography.titleSmall
                 )
                 Text(
@@ -630,7 +812,7 @@ fun ReaderTypographyBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "বাংলা ফন্ট সাইজ (Hind Siliguri)",
+                    text = "বাংলা ফন্ট সাইজ (${preferences.banglaFontStyle.titleBn})",
                     style = MaterialTheme.typography.titleSmall
                 )
                 Text(

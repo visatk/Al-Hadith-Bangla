@@ -23,6 +23,8 @@ import com.example.data.repository.HadithRepository
 import com.example.data.sqlite.QuranJsonDataSource
 import com.example.data.sqlite.SqliteAssetDataSource
 import com.example.ui.components.toEnglishDigits
+import com.example.ui.theme.ArabicFontStyle
+import com.example.ui.theme.BanglaFontStyle
 import com.example.ui.theme.ReaderThemeMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -496,5 +498,35 @@ class HadithViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setThemeMode(mode: ReaderThemeMode) {
         viewModelScope.launch { preferencesRepo.setThemeMode(mode) }
+    }
+
+    fun setArabicFontStyle(style: ArabicFontStyle) {
+        viewModelScope.launch { preferencesRepo.setArabicFontStyle(style) }
+    }
+
+    fun setBanglaFontStyle(style: BanglaFontStyle) {
+        viewModelScope.launch { preferencesRepo.setBanglaFontStyle(style) }
+    }
+
+    fun applyParametricPreset(
+        arabicSizeSp: Float,
+        banglaSizeSp: Float,
+        lineHeight: Float,
+        warmFilter: Float,
+        themeMode: ReaderThemeMode,
+        arabicFontStyle: ArabicFontStyle,
+        banglaFontStyle: BanglaFontStyle
+    ) {
+        viewModelScope.launch {
+            preferencesRepo.applyParametricReadingPreset(
+                arabicSizeSp = arabicSizeSp,
+                banglaSizeSp = banglaSizeSp,
+                lineHeight = lineHeight,
+                warmFilter = warmFilter,
+                themeMode = themeMode,
+                arabicFontStyle = arabicFontStyle,
+                banglaFontStyle = banglaFontStyle
+            )
+        }
     }
 }

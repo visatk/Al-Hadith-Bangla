@@ -7,6 +7,8 @@ import com.example.ui.components.stripArabicTashkeel
 import com.example.ui.components.toBanglaDigits
 import com.example.ui.components.toEnglishDigits
 import com.example.ui.screens.formatAyahForShare
+import com.example.ui.theme.ArabicFontStyle
+import com.example.ui.theme.BanglaFontStyle
 import com.example.ui.theme.ReaderThemeMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -60,10 +62,33 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun `verify ReaderThemeMode isDark flags`() {
+    fun `verify ReaderThemeMode palettes and multi-font typography enums`() {
+        assertEquals(4, ReaderThemeMode.entries.size)
         assertFalse(ReaderThemeMode.MANUSCRIPT_LIGHT.isDark)
         assertFalse(ReaderThemeMode.SEPIA_SCHOLAR.isDark)
+        assertFalse(ReaderThemeMode.MADINAH_GREEN.isDark)
         assertTrue(ReaderThemeMode.TAHAJJUD_DARK.isDark)
+
+        assertEquals(3, ArabicFontStyle.entries.size)
+        assertEquals(3, BanglaFontStyle.entries.size)
+
+        val fontDir = File("src/main/res/font").let {
+            if (it.exists()) it else File("app/src/main/res/font")
+        }
+        assertTrue("Font directory must exist", fontDir.exists())
+        val expectedFonts = listOf(
+            "amiri.ttf",
+            "scheherazade_new.ttf",
+            "noto_naskh_arabic.ttf",
+            "hind_siliguri.ttf",
+            "noto_serif_bengali.ttf",
+            "tiro_bangla.ttf",
+            "plus_jakarta_sans.ttf"
+        )
+        for (fontName in expectedFonts) {
+            val fontFile = File(fontDir, fontName)
+            assertTrue("Bundled font $fontName must exist", fontFile.exists() && fontFile.length() > 1024)
+        }
     }
 
     @Test

@@ -117,7 +117,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            AlHadithBanglaTheme(themeMode = readerPreferences.themeMode) {
+            AlHadithBanglaTheme(
+                themeMode = readerPreferences.themeMode,
+                banglaFontStyle = readerPreferences.banglaFontStyle,
+                arabicFontStyle = readerPreferences.arabicFontStyle
+            ) {
                 AlHadithAppRoot(viewModel = viewModel)
             }
         }
@@ -510,6 +514,9 @@ fun AlHadithAppRoot(viewModel: HadithViewModel) {
             onToggleExplanation = viewModel::setShowExplanation,
             onToggleTashkeel = viewModel::setShowTashkeel,
             onThemeModeChange = viewModel::setThemeMode,
+            onArabicFontStyleChange = viewModel::setArabicFontStyle,
+            onBanglaFontStyleChange = viewModel::setBanglaFontStyle,
+            onApplyPreset = viewModel::applyParametricPreset,
             onImportSqliteDatabase = { uri ->
                 viewModel.importExternalSqliteDatabase(uri)
             },

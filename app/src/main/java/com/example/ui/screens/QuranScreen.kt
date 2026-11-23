@@ -7,6 +7,7 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -72,11 +73,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -86,11 +90,13 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.local.entity.AyahEntity
 import com.example.data.local.entity.QuranReadingProgress
 import com.example.data.local.entity.ReaderPreferences
 import com.example.data.local.entity.SurahEntity
 import com.example.ui.components.IslamicGeometricDivider
+import com.example.ui.components.MushafVerseEndRosette
 import com.example.ui.components.RubElHizbMedallion
 import com.example.ui.components.stripArabicTashkeel
 import com.example.ui.components.toBanglaDigits
@@ -99,7 +105,6 @@ import com.example.ui.theme.AmiriArabicFontFamily
 import com.example.ui.theme.EmeraldDeep
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.GoldLight
-import com.example.ui.theme.HindSiliguriBanglaFontFamily
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -443,8 +448,7 @@ private fun SurahCatalogPane(
                         }
                         Text(
                             text = surah.nameAr,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontFamily = AmiriArabicFontFamily,
+                            style = MaterialTheme.typography.displayMedium.copy(
                                 fontSize = 22.sp,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -566,8 +570,8 @@ private fun SurahAyahReaderPane(
 
                             Text(
                                 text = surah.nameAr,
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontFamily = AmiriArabicFontFamily,
+                                style = MaterialTheme.typography.displayMedium.copy(
+                                    fontFamily = preferences.arabicFontStyle.fontFamily,
                                     fontSize = 22.sp,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -663,7 +667,10 @@ private fun SurahAyahReaderPane(
                 // Surah Ornamental Banner + Bismillah (except Surah At-Tawbah #9)
                 item(key = "surah_header_${surah.id}") {
                     Box(modifier = Modifier.widthIn(max = 780.dp)) {
-                        SurahBismillahBanner(surah = surah)
+                        SurahBismillahBanner(
+                            surah = surah,
+                            preferences = preferences
+                        )
                     }
                 }
 
@@ -750,53 +757,78 @@ private fun SurahAyahReaderPane(
 }
 
 @Composable
-private fun SurahBismillahBanner(surah: SurahEntity) {
+private fun SurahBismillahBanner(
+    surah: SurahEntity,
+    preferences: ReaderPreferences
+) {
     Card(
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = EmeraldDeep),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, GoldAccent.copy(alpha = 0.55f), RoundedCornerShape(22.dp))
+            .border(1.dp, GoldAccent.copy(alpha = 0.65f), RoundedCornerShape(22.dp))
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "سُورَةُ ${surah.nameAr}",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontFamily = AmiriArabicFontFamily,
-                    color = GoldLight,
-                    fontSize = 26.sp
-                )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Image(
+                painter = painterResource(id = R.drawable.img_quran_sanctuary_banner_1795432153972),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize()
             )
-            Text(
-                text = "সূরা ${surah.nameBn} • অর্থ: ${surah.meaningBn} • ${surah.revelationBn} • মোট আয়াত: ${surah.totalVerses.toBanglaDigits()}",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    color = Color.White.copy(alpha = 0.88f)
-                ),
-                textAlign = TextAlign.Center
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                EmeraldDeep.copy(alpha = 0.85f),
+                                EmeraldDeep.copy(alpha = 0.92f),
+                                EmeraldDeep.copy(alpha = 0.96f)
+                            )
+                        )
+                    )
             )
-
-            if (surah.id != 9 && surah.id != 1) {
-                Spacer(modifier = Modifier.height(10.dp))
-                IslamicGeometricDivider(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(14.dp)
-                )
-                Spacer(modifier = Modifier.height(6.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
-                    text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontFamily = AmiriArabicFontFamily,
-                        fontSize = 24.sp,
-                        color = Color.White
+                    text = "سُورَةُ ${surah.nameAr}",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontFamily = preferences.arabicFontStyle.fontFamily,
+                        color = GoldLight,
+                        fontSize = 27.sp
+                    )
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "সূরা ${surah.nameBn} • অর্থ: ${surah.meaningBn} • ${surah.revelationBn} • মোট আয়াত: ${surah.totalVerses.toBanglaDigits()}",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = Color.White.copy(alpha = 0.90f)
                     ),
                     textAlign = TextAlign.Center
                 )
+
+                if (surah.id != 9 && surah.id != 1) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    IslamicGeometricDivider(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(14.dp)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = preferences.arabicFontStyle.fontFamily,
+                            fontSize = 25.sp,
+                            color = Color.White
+                        ),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
@@ -842,9 +874,9 @@ fun QuranAyahCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    RubElHizbMedallion(
-                        label = ayah.ayahNumber.toBanglaDigits(),
-                        size = 42.dp
+                    MushafVerseEndRosette(
+                        ayahNumberBn = ayah.ayahNumber.toBanglaDigits(),
+                        size = 44.dp
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
@@ -891,7 +923,7 @@ fun QuranAyahCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
                         .border(
                             width = 1.dp,
                             color = GoldAccent.copy(alpha = 0.25f),
@@ -903,7 +935,7 @@ fun QuranAyahCard(
                         Text(
                             text = ayah.arabicText.stripArabicTashkeel(preferences.showTashkeel),
                             style = MaterialTheme.typography.displayMedium.copy(
-                                fontFamily = AmiriArabicFontFamily,
+                                fontFamily = preferences.arabicFontStyle.fontFamily,
                                 fontSize = preferences.arabicFontSizeSp.sp,
                                 lineHeight = (preferences.arabicFontSizeSp * (preferences.lineHeightMultiplier + 0.12f)).sp,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -922,7 +954,7 @@ fun QuranAyahCard(
                 Text(
                     text = ayah.banglaTranslation,
                     style = MaterialTheme.typography.bodyLarge.copy(
-                        fontFamily = HindSiliguriBanglaFontFamily,
+                        fontFamily = preferences.banglaFontStyle.fontFamily,
                         fontSize = preferences.banglaFontSizeSp.sp,
                         lineHeight = (preferences.banglaFontSizeSp * preferences.lineHeightMultiplier).sp,
                         color = MaterialTheme.colorScheme.onSurface

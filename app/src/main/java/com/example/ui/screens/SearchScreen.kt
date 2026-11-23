@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,12 +36,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.R
 import com.example.data.local.entity.AyahEntity
 import com.example.data.local.entity.BookEntity
 import com.example.data.local.entity.BookmarkEntity
@@ -241,13 +247,20 @@ fun SearchScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.widthIn(max = 560.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
+                    Image(
+                        painter = painterResource(id = R.drawable.img_scholar_empty_ornament_1795432153586),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                        modifier = Modifier.size(52.dp)
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(width = 148.dp, height = 110.dp)
+                            .clip(RoundedCornerShape(22.dp))
+                            .border(
+                                width = 1.dp,
+                                color = GoldAccent.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(22.dp)
+                            )
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Text(
                         text = if (isInitialEmptyState) {
                             "হাদিস ও আল-কুরআন থেকে মুহূর্তেই খুঁজুন"

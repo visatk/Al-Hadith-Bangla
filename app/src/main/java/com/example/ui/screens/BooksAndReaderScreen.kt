@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -61,9 +62,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -71,6 +76,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.local.entity.BookEntity
 import com.example.data.local.entity.BookmarkEntity
 import com.example.data.local.entity.ChapterEntity
@@ -83,7 +89,9 @@ import com.example.ui.components.parseHexColor
 import com.example.ui.components.toBanglaDigits
 import com.example.ui.components.toEnglishDigits
 import com.example.ui.theme.AmiriArabicFontFamily
+import com.example.ui.theme.EmeraldDeep
 import com.example.ui.theme.GoldAccent
+import com.example.ui.theme.GoldLight
 import kotlinx.coroutines.launch
 
 @Composable
@@ -262,17 +270,59 @@ private fun AllBooksCatalogPane(
                     .fillMaxWidth()
                     .widthIn(max = 840.dp)
             ) {
-                Text(
-                    text = "হাদিস গ্রন্থসমূহ",
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                    modifier = Modifier.semantics { heading() }
-                )
-                Text(
-                    text = "অধ্যায় ও পরিচ্ছেদ অনুযায়ী হাদিস অধ্যয়ন করতে যেকোনো গ্রন্থ নির্বাচন করুন",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                )
+                Card(
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = EmeraldDeep),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, GoldAccent.copy(alpha = 0.55f), RoundedCornerShape(22.dp))
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Image(
+                            painter = painterResource(id = R.drawable.img_hadith_library_banner_1795432153113),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.matchParentSize()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            EmeraldDeep.copy(alpha = 0.94f),
+                                            EmeraldDeep.copy(alpha = 0.85f),
+                                            EmeraldDeep.copy(alpha = 0.72f)
+                                        )
+                                    )
+                                )
+                        )
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Text(
+                                text = "كُتُبُ الْحَدِيثِ النَّبَوِيِّ",
+                                style = MaterialTheme.typography.displayMedium.copy(
+                                    fontSize = 20.sp,
+                                    color = GoldLight
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "হাদিস গ্রন্থসমূহ",
+                                style = MaterialTheme.typography.headlineLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                ),
+                                modifier = Modifier.semantics { heading() }
+                            )
+                            Text(
+                                text = "অধ্যায় ও পরিচ্ছেদ অনুযায়ী হাদিস অধ্যয়ন করতে যেকোনো গ্রন্থ নির্বাচন করুন",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = Color.White.copy(alpha = 0.88f)
+                                )
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = filterQuery,

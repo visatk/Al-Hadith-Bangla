@@ -10,6 +10,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.data.local.entity.QuranReadingProgress
 import com.example.data.local.entity.ReaderPreferences
+import com.example.ui.theme.ArabicFontStyle
+import com.example.ui.theme.BanglaFontStyle
 import com.example.ui.theme.ReaderThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -32,6 +34,8 @@ class UserPreferencesRepository(private val context: Context) {
         val EYE_CARE_WARM_FILTER = floatPreferencesKey("eye_care_warm_filter")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on_reading")
         val THEME_MODE = stringPreferencesKey("reader_theme_mode")
+        val ARABIC_FONT_STYLE = stringPreferencesKey("arabic_font_style")
+        val BANGLA_FONT_STYLE = stringPreferencesKey("bangla_font_style")
 
         // Fast Startup Sync Fingerprint
         val LAST_SYNC_FINGERPRINT = stringPreferencesKey("last_sync_fingerprint_v2")
@@ -56,6 +60,14 @@ class UserPreferencesRepository(private val context: Context) {
         val themeMode = runCatching { ReaderThemeMode.valueOf(themeStr) }
             .getOrDefault(ReaderThemeMode.MANUSCRIPT_LIGHT)
 
+        val arabicFontStr = prefs[Keys.ARABIC_FONT_STYLE] ?: ArabicFontStyle.AMIRI.name
+        val arabicFontStyle = runCatching { ArabicFontStyle.valueOf(arabicFontStr) }
+            .getOrDefault(ArabicFontStyle.AMIRI)
+
+        val banglaFontStr = prefs[Keys.BANGLA_FONT_STYLE] ?: BanglaFontStyle.HIND_SILIGURI.name
+        val banglaFontStyle = runCatching { BanglaFontStyle.valueOf(banglaFontStr) }
+            .getOrDefault(BanglaFontStyle.HIND_SILIGURI)
+
         ReaderPreferences(
             arabicFontSizeSp = (prefs[Keys.ARABIC_FONT_SIZE] ?: 26f).coerceIn(20f, 40f),
             banglaFontSizeSp = (prefs[Keys.BANGLA_FONT_SIZE] ?: 17f).coerceIn(14f, 26f),
@@ -66,7 +78,9 @@ class UserPreferencesRepository(private val context: Context) {
             showTashkeel = prefs[Keys.SHOW_TASHKEEL] ?: true,
             eyeCareWarmFilter = (prefs[Keys.EYE_CARE_WARM_FILTER] ?: 0.0f).coerceIn(0f, 0.28f),
             keepScreenOnWhileReading = prefs[Keys.KEEP_SCREEN_ON] ?: true,
-            themeMode = themeMode
+            themeMode = themeMode,
+            arabicFontStyle = arabicFontStyle,
+            banglaFontStyle = banglaFontStyle
         )
     }
 
@@ -135,5 +149,33 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setThemeMode(mode: ReaderThemeMode) {
         context.dataStore.edit { it[Keys.THEME_MODE] = mode.name }
+    }
+
+    suspend fun setArabicFontStyle(style: ArabicFontStyle) {
+        context.dataStore.edit { it[Keys.ARABIC_FONT_STYLE] = style.name }
+    }
+
+    suspend fun setBanglaFontStyle(style: BanglaFontStyle) {
+        context.dataStore.edit { it[Keys.BANGLA_FONT_STYLE] = style.name }
+    }
+
+    suspend fun applyParametricReadingPreset(
+        arabicSizeSp: Float,
+        banglaSizeSp: Float,
+        lineHeight: Float,
+        warmFilter: Float,
+        themeMode: ReaderThemeMode,
+        arabicFontStyle: ArabicFontStyle,
+        banglaFontStyle: BanglaFontStyle
+    ) {
+        context.dataStore.edit {
+            it[Keys.ARABIC_FONT_SIZE] = arabicSizeSp.coerceIn(20f, 40f)
+            it[Keys.BANGLA_FONT_SIZE] = banglaSizeSp.coerceIn(14f, 26f)
+            it[Keys.LINE_HEIGHT_MULTIPLIER] = lineHeight.coerceIn(1.4f, 2.1f)
+            it[Keys.EYE_CARE_WARM_FILTER] = warmFilter.coerceIn(0f, 0.28f)
+            it[Keys.THEME_MODE] = themeMode.name
+            it[Keys.ARABIC_FONT_STYLE] = arabicFontStyle.name
+            it[Keys.BANGLA_FONT_STYLE] = banglaFontStyle.name
+        }
     }
 }

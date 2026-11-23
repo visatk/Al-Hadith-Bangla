@@ -266,6 +266,55 @@ fun String.stripArabicTashkeel(keepTashkeel: Boolean): String {
 }
 
 /**
+ * Illuminated 8-petal Quranic Mushaf Verse-End Rosette (`۝` style) drawn via `Modifier.drawWithCache`
+ * for authentic Al-Quran Ayah numbering and ornamental headers.
+ */
+@Composable
+fun MushafVerseEndRosette(
+    ayahNumberBn: String,
+    modifier: Modifier = Modifier,
+    size: Dp = 44.dp,
+    primaryColor: Color = MaterialTheme.colorScheme.primary,
+    goldColor: Color = GoldAccent
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .drawWithCache {
+                val outerRadius = this.size.minDimension * 0.44f
+                val innerRadius = this.size.minDimension * 0.34f
+                val stroke = Stroke(width = 1.5.dp.toPx())
+                val petalSide = this.size.minDimension * 0.58f
+                val topLeft = Offset((this.size.width - petalSide) / 2f, (this.size.height - petalSide) / 2f)
+                val rectSize = Size(petalSide, petalSide)
+                val fillTint = goldColor.copy(alpha = 0.14f)
+                val centerTint = primaryColor.copy(alpha = 0.10f)
+
+                onDrawBehind {
+                    for (angle in intArrayOf(0, 30, 60)) {
+                        rotate(degrees = angle.toFloat()) {
+                            drawRect(color = fillTint, topLeft = topLeft, size = rectSize)
+                            drawRect(color = goldColor, topLeft = topLeft, size = rectSize, style = stroke)
+                        }
+                    }
+                    drawCircle(color = centerTint, radius = outerRadius)
+                    drawCircle(color = goldColor, radius = innerRadius, style = stroke)
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = ayahNumberBn,
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = if (ayahNumberBn.length >= 3) 11.sp else 13.sp,
+                color = primaryColor
+            )
+        )
+    }
+}
+
+/**
  * Safe hex color parser for book emblems.
  */
 fun parseHexColor(hex: String, fallback: Color = Color(0xFF0B5D48)): Color {

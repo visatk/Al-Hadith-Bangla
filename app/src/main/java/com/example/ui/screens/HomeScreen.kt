@@ -552,59 +552,81 @@ private fun AlQuranQuickAccessCard(
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                color = GoldAccent.copy(alpha = 0.55f),
-                shape = RoundedCornerShape(20.dp)
+                color = GoldAccent.copy(alpha = 0.65f),
+                shape = RoundedCornerShape(22.dp)
             )
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(22.dp))
             .clickable { onClick() }
             .testTag("home_quran_quick_card"),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(
             containerColor = EmeraldDeep
-        )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                RubElHizbMedallion(
-                    label = "কুরআন",
-                    size = 48.dp,
-                    primaryColor = GoldLight,
-                    accentColor = GoldAccent
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = "আল-কুরআনুল কারীম (বাংলা অনুবাদ)",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    )
-                    Text(
-                        text = "${totalSurahs.toBanglaDigits()} টি সূরা • ${totalAyahs.toBanglaDigits()} টি আয়াত • সূরা ও আয়াত জাম্প",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = GoldLight
-                        )
-                    )
-                }
-            }
-            Text(
-                text = "القرآن",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = AmiriArabicFontFamily,
-                    color = GoldLight,
-                    fontSize = 22.sp
-                )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Image(
+                painter = painterResource(id = R.drawable.img_quran_sanctuary_banner_1795432153972),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize()
             )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                EmeraldDeep.copy(alpha = 0.94f),
+                                EmeraldDeep.copy(alpha = 0.85f),
+                                EmeraldDeep.copy(alpha = 0.76f)
+                            )
+                        )
+                    )
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    RubElHizbMedallion(
+                        label = "কুরআন",
+                        size = 50.dp,
+                        primaryColor = GoldLight,
+                        accentColor = GoldAccent
+                    )
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = "আল-কুরআনুল কারীম (বাংলা অনুবাদ)",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${totalSurahs.toBanglaDigits()} টি সূরা • ${totalAyahs.toBanglaDigits()} টি আয়াত • সূরা ও আয়াত জাম্প",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = GoldLight
+                            )
+                        )
+                    }
+                }
+                Text(
+                    text = "القرآن",
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        color = GoldLight,
+                        fontSize = 24.sp
+                    )
+                )
+            }
         }
     }
 }
